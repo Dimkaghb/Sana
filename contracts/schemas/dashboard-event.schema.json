@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sana-shield:contract:C:1.0.0",
+  "title": "DashboardRealtimeEvent",
+  "type": "object",
+  "description": "Contract C: backend -> dashboard. A completed session snapshot, not continuous telemetry.",
+  "properties": {
+    "type": {
+      "const": "SESSION_SCORED",
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "account_label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "SUCCESS",
+        "MIRAGE_HOLD",
+        "STEP_UP_LIVENESS"
+      ]
+    },
+    "overall_risk_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "scores": {
+      "type": "object",
+      "properties": {
+        "anti_rat_physics_risk": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "coercion_stress_risk": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "operator_mismatch_risk": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "anti_rat_physics_risk",
+        "coercion_stress_risk",
+        "operator_mismatch_risk"
+      ],
+      "additionalProperties": false
+    },
+    "flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "title",
+          "detail"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recoil_waveform": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "t_ms": {
+            "type": "number"
+          },
+          "az_delta": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "t_ms",
+          "az_delta"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "map_point": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "cluster_id": {
+          "type": "integer"
+        },
+        "operator_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "cluster_id",
+        "operator_id",
+        "status"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "type",
+    "timestamp",
+    "session_id",
+    "account_id",
+    "account_label",
+    "decision",
+    "overall_risk_score",
+    "scores",
+    "flags",
+    "recoil_waveform",
+    "map_point"
+  ],
+  "additionalProperties": false
+}

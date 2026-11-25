@@ -1,0 +1,35 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+.DS_Store
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# Frontend
+node_modules/
+.next/
+dist/
+coverage/
+*.tsbuildinfo
+# Local data; synthetic contracts/fixtures remain tracked
+backend/data/
+ml/data/
+ml/artifacts/
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+tmp/
+output/

@@ -1,0 +1,47 @@
+{
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "name": "normal",
+      "description": "Matching owner and normal interaction; illustrative SUCCESS.",
+      "synthetic": true,
+      "contracts": {"A":"normal/telemetry.json","B":"normal/ml-score.json","C":"normal/dashboard-event.json","D":"normal/mobile-decision.json"}
+    },
+    {
+      "name": "synthetic_touch",
+      "description": "Constructed flat IMU and untrusted interaction; illustrative physics hold.",
+      "synthetic": true,
+      "contracts": {"A":"synthetic_touch/telemetry.json","B":"synthetic_touch/ml-score.json","C":"synthetic_touch/dashboard-event.json","D":"synthetic_touch/mobile-decision.json"}
+    },
+    {
+      "name": "missing_sensors",
+      "description": "A only. No motion is available; output semantics are unresolved.",
+      "synthetic": true,
+      "contracts": {"A":"missing_sensors/telemetry.json"}
+    },
+    {
+      "name": "dictation",
+      "description": "Three digit bursts separated by listening-length pauses.",
+      "synthetic": true,
+      "contracts": {"A":"dictation/telemetry.json","B":"dictation/ml-score.json","C":"dictation/dashboard-event.json","D":"dictation/mobile-decision.json"}
+    },
+    {
+      "name": "handoff",
+      "description": "ML handoff with amount above 100,000 KZT.",
+      "synthetic": true,
+      "contracts": {"A":"handoff/telemetry.json","B":"handoff/ml-score.json","C":"handoff/dashboard-event.json","D":"handoff/mobile-decision.json"}
+    },
+    {
+      "name": "ring",
+      "description": "Three linked accounts and confidence above 0.80.",
+      "synthetic": true,
+      "contracts": {"A":"ring/telemetry.json","B":"ring/ml-score.json","C":"ring/dashboard-event.json","D":"ring/mobile-decision.json"}
+    },
+    {
+      "name": "banned_operator",
+      "description": "ML marks a previously banned operator.",
+      "synthetic": true,
+      "contracts": {"A":"banned_operator/telemetry.json","B":"banned_operator/ml-score.json","C":"banned_operator/dashboard-event.json","D":"banned_operator/mobile-decision.json"}
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "type": "SESSION_SCORED",
+  "timestamp": "2026-11-26T14:22:01Z",
+  "session_id": "sess_fixture_synthetic_touch",
+  "account_id": "acc_student_101",
+  "account_label": "Demo account 101",
+  "decision": "MIRAGE_HOLD",
+  "overall_risk_score": 98,
+  "scores": {
+    "anti_rat_physics_risk": 98,
+    "coercion_stress_risk": 12,
+    "operator_mismatch_risk": 6
+  },
+  "flags": [
+    {
+      "code": "ZERO_RECOIL_RAT",
+      "severity": "CRITICAL",
+      "title": "Synthetic interaction fixture",
+      "detail": "Constructed flat acceleration and untrusted events; not a measured remote-access test."
+    }
+  ],
+  "recoil_waveform": [
+    {
+      "t_ms": -33.333,
+      "az_delta": 0.0
+    },
+    {
+      "t_ms": -16.667,
+      "az_delta": 0.0
+    },
+    {
+      "t_ms": 0,
+      "az_delta": 0.0
+    },
+    {
+      "t_ms": 16.667,
+      "az_delta": 0.0
+    },
+    {
+      "t_ms": 33.333,
+      "az_delta": 0.0
+    }
+  ],
+  "map_point": {
+    "x": 1.2,
+    "y": 0.8,
+    "cluster_id": 1,
+    "operator_id": "op_demo_owner",
+    "status": "CRITICAL"
+  }
+}

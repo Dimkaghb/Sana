@@ -1,0 +1,7 @@
+# Pinned contract-tooling environment, including transitive dependencies.
+# Verified on Python 3.14.5; application dependencies follow in later steps.
+attrs==26.1.0
+jsonschema==4.23.0
+jsonschema-specifications==2025.9.1
+referencing==0.37.0
+rpds-py==2026.9.1

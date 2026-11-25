@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sana-shield:contract:A:1.0.0",
+  "title": "SessionTelemetryPayload",
+  "type": "object",
+  "description": "Contract A: SDK -> backend -> ML. Measurements use session-relative milliseconds, m/s^2, and orientation degrees.",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "device_meta": {
+      "type": "object",
+      "properties": {
+        "screen_w": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "screen_h": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "os": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_rate_hz": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "screen_w",
+        "screen_h",
+        "os",
+        "sample_rate_hz"
+      ],
+      "additionalProperties": false
+    },
+    "started_at_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "duration_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "keystrokes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key_group": {
+            "type": "string",
+            "enum": [
+              "digit",
+              "backspace"
+            ]
+          },
+          "down_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "up_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "dx_norm": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "dy_norm": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "key_group",
+          "down_ms",
+          "up_ms",
+          "dx_norm",
+          "dy_norm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "taps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "t_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "x_norm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y_norm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "radius_x": {
+            "type": "number",
+            "minimum": 0
+          },
+          "radius_y": {
+            "type": "number",
+            "minimum": 0
+          },
+          "is_trusted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "t_ms",
+          "x_norm",
+          "y_norm",
+          "radius_x",
+          "radius_y",
+          "is_trusted"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "slider_trace": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "t_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "x_norm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y_norm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "pressure": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "t_ms",
+          "x_norm",
+          "y_norm",
+          "pressure"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "imu_samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "t_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "ax": {
+            "type": "number"
+          },
+          "ay": {
+            "type": "number"
+          },
+          "az": {
+            "type": "number"
+          },
+          "alpha": {
+            "type": "number"
+          },
+          "beta": {
+            "type": "number"
+          },
+          "gamma": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "t_ms",
+          "ax",
+          "ay",
+          "az",
+          "alpha",
+          "beta",
+          "gamma"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "transfer_context": {
+      "type": "object",
+      "properties": {
+        "amount_kzt": {
+          "type": "number",
+          "minimum": 0
+        },
+        "is_new_recipient": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "amount_kzt",
+        "is_new_recipient"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "session_id",
+    "account_id",
+    "device_meta",
+    "started_at_ms",
+    "duration_ms",
+    "keystrokes",
+    "taps",
+    "slider_trace",
+    "imu_samples",
+    "transfer_context"
+  ],
+  "additionalProperties": false
+}

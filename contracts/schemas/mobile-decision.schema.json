@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sana-shield:contract:D:1.0.0",
+  "title": "MobileTransferDecision",
+  "type": "object",
+  "description": "Contract D: backend -> mobile UI. A simulated transfer decision in this prototype.",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "ui_mode": {
+      "type": "string",
+      "enum": [
+        "SUCCESS",
+        "MIRAGE_HOLD",
+        "STEP_UP_LIVENESS"
+      ]
+    },
+    "display_title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "display_subtitle": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_code": {
+      "type": "string",
+      "minLength": 1
+    },
+    "guardian_notified": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "session_id",
+    "ui_mode",
+    "display_title",
+    "display_subtitle",
+    "reference_code",
+    "guardian_notified"
+  ],
+  "additionalProperties": false
+}

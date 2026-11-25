@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sana-shield:contract:B:1.0.0",
+  "title": "MLScoreResponse",
+  "type": "object",
+  "description": "Contract B: ML -> backend. Preview is not a full embedding or a probability.",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "embedding_dim": {
+      "const": 128,
+      "type": "integer"
+    },
+    "embedding_preview": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "number",
+        "minimum": -1,
+        "maximum": 1
+      }
+    },
+    "owner_verification": {
+      "type": "object",
+      "properties": {
+        "cosine_similarity": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "is_handoff_detected": {
+          "type": "boolean"
+        },
+        "baseline_sessions_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "cosine_similarity",
+        "is_handoff_detected",
+        "baseline_sessions_count"
+      ],
+      "additionalProperties": false
+    },
+    "operator_reconciliation": {
+      "type": "object",
+      "properties": {
+        "matched_operator_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "match_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "is_banned_operator": {
+          "type": "boolean"
+        },
+        "linked_account_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "uniqueItems": true
+        },
+        "ring_size": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "matched_operator_id",
+        "match_confidence",
+        "is_banned_operator",
+        "linked_account_ids",
+        "ring_size"
+      ],
+      "additionalProperties": false
+    },
+    "map_point": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "cluster_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "cluster_id"
+      ],
+      "additionalProperties": false
+    },
+    "inference_ms": {
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "session_id",
+    "embedding_dim",
+    "embedding_preview",
+    "owner_verification",
+    "operator_reconciliation",
+    "map_point",
+    "inference_ms"
+  ],
+  "additionalProperties": false
+}
