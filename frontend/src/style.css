@@ -124,8 +124,7 @@ a svg {
   gap: 7px;
   font-size: 12px;
 }
-.env i,
-.map-legend i {
+.env i {
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -137,7 +136,6 @@ a svg {
 .console-foot,
 .overview,
 .panel-head,
-.map-legend,
 .metric > div,
 .wave > div,
 .score-head,
@@ -299,75 +297,9 @@ a svg {
   font-weight: 540;
   margin-top: 5px;
 }
-.map {
-  position: relative;
-  margin: 0 14px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--bg);
-  height: clamp(215px, 18vw, 310px);
-}
-.map svg {
-  width: 100%;
-  height: 100%;
-}
-.map-dot {
-  cursor: pointer;
-}
-.map-dot:hover circle,
-.map-dot:focus circle {
-  stroke: white;
-}
-.map-empty {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 5px;
-  pointer-events: none;
-}
-.map-empty svg {
-  width: 32px;
-  height: 32px;
-  color: var(--navy);
-  margin-bottom: 6px;
-}
-.map-empty strong {
-  font-size: 15px;
-  font-weight: 500;
-}
-.map-empty small,
 .wave small {
   font-size: 11px;
   color: var(--muted);
-}
-.map-legend {
-  padding: 14px 20px;
-  font-size: 10px;
-  color: var(--muted);
-}
-.map-legend div {
-  display: flex;
-  gap: 13px;
-}
-.map-legend span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.map-legend span:nth-child(2) i {
-  background: var(--warning);
-}
-.map-legend span:nth-child(3) i {
-  background: var(--critical);
-}
-.map-legend b {
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  font-weight: 500;
 }
 .signal-body {
   padding: 0 21px 12px;
@@ -961,15 +893,9 @@ dialog input,
   .signal-body {
     padding: 0 15px 10px;
   }
-  .map {
-    margin: 0 10px;
-  }
   .desk {
     padding-left: 15px;
     padding-right: 15px;
-  }
-  .map-legend {
-    padding: 12px;
   }
   .toolbar {
     flex-wrap: wrap;
@@ -1019,9 +945,6 @@ dialog input,
     font-size: 10px;
     padding: 6px;
     gap: 4px;
-  }
-  .map {
-    height: 215px;
   }
   .toolbar select {
     max-width: 100%;
@@ -1128,17 +1051,6 @@ dialog input,
 .checkline + .checkline {
   margin-top: 5px;
 }
-@keyframes appear {
-  from {
-    opacity: 0.1;
-  }
-  to {
-    opacity: 1;
-  }
-}
-.map-dot {
-  animation: appear 0.75s ease-out;
-}
 @media (min-width: 1600px) {
   .desk {
     width: min(94%, 1800px);
@@ -1153,7 +1065,6 @@ dialog input,
     font-size: 15px;
   }
   .desk .eyebrow,
-  .map-legend,
   .metric footer,
   .wave small,
   .toolbar button,
@@ -1172,9 +1083,6 @@ dialog input,
   .badge,
   .alerts small {
     font-size: 12px;
-  }
-  .map {
-    height: 270px;
   }
   .signal .bar {
     margin-top: 14px;
@@ -1937,10 +1845,6 @@ body {
   align-items: center;
   gap: 10px;
   margin-top: 12px;
-  font-size: 12px;
-}
-.projection-name {
-  color: var(--muted);
   font-size: 12px;
 }
 .bars i.SUCCESS,

@@ -479,6 +479,9 @@ export function Dashboard({ alias }: { alias?: string }) {
         {view === "map" ? (
           <>
             <PopulationMap
+              key={pages.at(-1)}
+              preview={preview}
+              unavailable={status === "Service unavailable"}
               data={data}
               selected={selected}
               onSelect={(d) => {

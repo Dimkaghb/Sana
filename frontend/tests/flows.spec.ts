@@ -225,7 +225,9 @@ test("population view preserves current ban status over the historical session s
     .getByRole("button", { name: "Population map", exact: true })
     .click();
   await page
-    .getByRole("button", { name: "Inspect " + dot.operator_id, exact: true })
+    .getByRole("button", {
+      name: `Inspect session ${dot.session_id}, Critical, Group ${dot.cluster_id}`,
+    })
     .click();
   await expect(page.getByText("Operator status · banned")).toBeVisible();
   await expect(page.getByText("Synthetic seed session")).toBeVisible();
@@ -385,4 +387,57 @@ test("browser virtual sensors retain stationary orientation while motion continu
     ((payload.imu_samples.length - 1) * 1000) /
     (payload.imu_samples.at(-1)!.t_ms - payload.imu_samples[0].t_ms);
   expect(payload.device_meta.sample_rate_hz).toBeCloseTo(measured);
+});
+
+test("population map expands, filters and drills into sessions without losing the dossier", async ({
+  page,
+}) => {
+  await page.goto("/dashboard/map?mode=fixtures");
+  await expect(
+    page.getByText(/Each dot is one transfer session/),
+  ).toBeVisible();
+  const guide = page.getByRole("button", { name: "How to read this map" });
+  await guide.click();
+  await expect(
+    page.getByText(/A group can include different people/),
+  ).toBeVisible();
+  await guide.click();
+  await expect(guide).toHaveAttribute("aria-expanded", "false");
+  await page
+    .getByRole("button", { name: "Explore Group 1, 5 sessions" })
+    .click();
+  await expect(page.locator(".atlas-session")).toHaveCount(5);
+  await page.getByRole("button", { name: "Back to behavior groups" }).click();
+  const expand = page.getByRole("button", { name: "Expand", exact: true });
+  await expand.click();
+  const map = page.getByRole("dialog", { name: "Expanded population map" });
+  await expect(map).toBeVisible();
+  await expect
+    .poll(() =>
+      map
+        .locator(".atlas-canvas")
+        .evaluate(
+          (el) =>
+            el.querySelector<SVGSVGElement>(":scope > svg")?.viewBox.baseVal
+              .width === el.clientWidth,
+        ),
+    )
+    .toBe(true);
+  await map.getByRole("button", { name: "Zoom in" }).click();
+  await expect(map.locator(".atlas-zoom span")).toHaveText("2×");
+  await map.getByRole("button", { name: "Fit all sessions" }).click();
+  await map.getByRole("button", { name: "Normal", exact: true }).click();
+  await expect(
+    map.getByRole("button", { name: "Normal", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await map.locator(".atlas-row").first().click();
+  await expect(
+    map.getByRole("button", { name: "Back to behavior groups" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(expand).toBeFocused();
+  await page.locator(".atlas-session").first().click();
+  await expect(
+    page.getByText("OPERATOR DOSSIER", { exact: true }),
+  ).toBeVisible();
 });
