@@ -1,57 +1,75 @@
 # SANA Shield
 
-A simulated BCC transfer app, analyst dashboard, and Guardian view backed by physical-interaction checks and a separate behavioral identity service.
+Клиент может сам подтвердить перевод, даже когда реквизиты ему диктует мошенник. SANA Shield помогает банку заметить такой сценарий по ритму нажатий и жестам. В учебном приложении клиент получает квитанцию, аналитик видит основание решения, а доверенный контакт может получить уведомление через Guardian.
 
-## Start a complete rehearsal
+[![Обложка презентации SANA Shield для Банка ЦентрКредит](docs/demo/sana-shield-cover.jpg)](docs/demo/SANA-Shield-BCC-Pitch-RU.pptx)
 
-After installing the backend and ML environments and running `npm ci && npm run build` in `frontend/`, start both services and the built web app from the repository root:
+**[Презентация для БЦК · 16 слайдов](docs/demo/SANA-Shield-BCC-Pitch-RU.pptx)** · **[Ролик на русском · 51 секунда](docs/demo/SANA-Shield-Launch-RU.mp4)** · **[Как работает ML-модель](docs/demo/sana-signal-directors-cut.mp4)**
+
+## Один перевод глазами аналитика
+
+В учебном сценарии клиент отправляет **450 000 ₸ новому получателю**. Девять нажатий складываются в три короткие серии с двумя паузами по 1,1 секунды. Сами по себе паузы могут означать, что человек сверяет реквизиты. В сочетании с новым получателем оценка признаков давления достигает **80 баллов при пороге 75**. Учебный перевод приостанавливается. Клиент видит «Перевод в обработке», а аналитик может открыть карточку с измерениями и версией правила.
+
+Чтобы воспроизвести пример, откройте `/mobile?mode=fixtures` и выберите **dictation**. В `/dashboard?mode=fixtures` откройте карточку **Possible coaching on a transfer to a new recipient**. В `/guardian?mode=fixtures` найдите ту же операцию по номеру **DEMO-42B7**. [Данные этого сценария](contracts/fixtures/dictation/)
+
+## Из чего состоит система
+
+| Компонент | Что делает |
+| --- | --- |
+| **KinetiqSDK** · TypeScript | На экране перевода фиксирует время нажатий, нормированные координаты жеста и доступные показания датчиков. Введённые цифры, текст полей и содержимое буфера обмена исключены из телеметрии. |
+| **Anti-RAT Physics и анализ ритма** · Python | Сопоставляет касание с откликом акселерометра и ищет серии ввода с длинными паузами. Если измерений недостаточно, канал помечается как недоступный. |
+| **Поведенческие эмбеддинги** · PyTorch, Qdrant | Одномерная свёрточная сеть обрабатывает временные сигналы и перекрывающиеся окна по 2 секунды с шагом в секунду. Энкодер объединяет их со статистикой сеанса в вектор из 128 чисел. Косинусное сходство помогает находить похожие сеансы на разных счетах. |
+| **Risk Fusion** · FastAPI, SQLite, WebSocket | Учитывает доступные оценки и контекст перевода, применяет версию правил и сохраняет решение перед отправкой события аналитику. |
+| **Кабинет аналитика** · React, Vite | Показывает очередь переводов, досье и карту UMAP с группами HDBSCAN. Одна точка соответствует сеансу. Из группы можно перейти к конкретному переводу. Доступен и трёхмерный вид PCA. |
+| **Guardian** | Показывает доверенному контакту статус приостановленного перевода по привязанному счёту и предлагает связаться с владельцем. |
+
+Прототип работает на локальном стенде с учебными переводами. ML-модель проверена на синтетических сеансах. Частоту ложных срабатываний и точность на реальных телефонах предстоит измерить в пилоте.
+
+## Быстрый запуск
+
+**Посмотреть интерфейс.** Нужен Node.js 22.12 или новее. Из корня репозитория выполните команды ниже и откройте `/dashboard?mode=fixtures` по адресу, который напечатает Vite. В этом режиме доступны готовые примеры без учётной записи.
 
 ```sh
-.venv/bin/python -m scripts.rehearse --mode live
+npm --prefix frontend ci
+npm --prefix frontend run dev
 ```
 
-Open the printed dashboard, mobile, and Guardian URLs. Each run creates a new private local directory for its databases and a mode-0600 access file containing per-account passwords under `logins` and the scoped Guardian credentials under `guardians`. Sign in at `/mobile` with a mobile alias such as `acc_student_101`, and at `/dashboard` with `analyst`. The phone receives its receipt and the analyst receives the persisted event. Open **Signal windows** for the normalized measurements, **Accounts** for account-filtered transfers, and **Population map** for the three-dimensional embedding projection. Ctrl-C stops both services. Use `--mode mock` for a fixture rehearsal without installing ML. Use the [offline LAN instructions](docs/OFFLINE_REHEARSAL.md) to run on actual phones. A [60-second software rehearsal](docs/demo/software-rehearsal.mp4) is available for projector backup.
-
-## Run locally
-
-Use Python 3.12 for the backend and ML environments. From the repository root:
+**Пройти перевод от телефона до аналитика.** После установки frontend-зависимостей в новом терминале выполните команды из корня репозитория. Для бэкенда нужен Python 3.12.
 
 ```sh
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -r backend/requirements.txt
-.venv/bin/python -m backend.accounts mobile acc_student_101
-.venv/bin/python -m backend.accounts analyst analyst
-ML_MODE=mock .venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+npm --prefix frontend run build
+.venv/bin/python -m scripts.rehearse --mode mock
 ```
 
-In a second terminal:
+Сценарий напечатает адреса `/mobile`, `/dashboard`, `/guardian` и путь к локальному файлу `access.json`. Для телефона используйте логин `acc_student_101`, для аналитика — `analyst`. Пароли текущего запуска находятся в разделе `logins`, токены Guardian — в `guardians`. В режиме `mock` бэкенд сохраняет решения в SQLite, а сервис идентификации возвращает демонстрационные оценки.
+
+**Включить ML-модель.** Остановите предыдущий стенд сочетанием Ctrl-C. Установите ML-окружение через `uv` и запустите тот же сценарий в режиме `live`. Первый запуск подготавливает модель и демонстрационную карту. Для физических телефонов нужен доверенный HTTPS. [Инструкция для офлайн-демо в локальной сети](docs/OFFLINE_REHEARSAL.md)
 
 ```sh
-cd frontend
-npm ci
-npm run dev
+uv sync --project ml --locked --python 3.12
+.venv/bin/python -m scripts.rehearse --mode live
 ```
 
-Open the local Vite URL at `/mobile`, `/dashboard`, or `/guardian`. The eight-slide offline presentation is at `/pitch.html`. Use the arrow keys to advance. Development paths proxy to the local backend. Mock mode labels its synthetic identity evidence. Real phone sensors require a trusted HTTPS origin.
-
-For live scoring, prepare the seed, model, and local identity service using the [ML instructions](ml/README.md). Start the backend with `ML_MODE=live` and `ML_SERVICE_URL=http://127.0.0.1:8001`. Use the [backend instructions](backend/README.md) to configure scoped demo credentials and SQLite, and the [offline runbook](docs/OFFLINE_REHEARSAL.md) for a single HTTPS origin on the LAN.
-
-## Verify
+## Проверка
 
 ```sh
 .venv/bin/python scripts/validate_contracts.py
-.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m unittest discover -s tests
+.venv/bin/python -m unittest discover -s backend/tests
 .venv/bin/python -m scripts.check_demo
-# After preparing the live model and ML environment:
+npm --prefix frontend test
+# После установки ML-окружения
+ml/.venv/bin/python -m unittest discover -s ml/tests
 .venv/bin/python -m scripts.check_live
 ```
 
-The demo check starts an isolated mock-mode service, uses HTTP and WebSocket clients, checks the seven scenarios, and restarts the service against its temporary database. Component-specific checks are in the [frontend](frontend/README.md), [backend](backend/README.md), and [ML](ml/README.md) guides.
+Браузерные тесты используют локальный Chrome на macOS или Playwright Chromium. [Установка браузера и настройки frontend](frontend/README.md)
 
-## Project references
+## Документация и материалы
 
-- [Product execution plan and verification record](docs/PRODUCT_EXECUTION_PLAN.md)
-- [Contract schemas and semantics](CONTRACTS.md)
-- [Architecture and handoffs](docs/ARCHITECTURE.md)
-- [SDK and backend implementation milestones](docs/IMPLEMENTATION_PLAN.md)
-- [Repository rules](AGENTS.md) and [original PRD](Markdown%20Live%20Preview.pdf)
+- [Архитектура и границы сервисов](docs/ARCHITECTURE.md) · [Контракты A–D](CONTRACTS.md) · [Семь учебных сценариев](contracts/fixtures/manifest.json)
+- [Frontend и маршруты](frontend/README.md) · [Backend и хранение](backend/README.md) · [ML, обучение и оценка](ml/README.md)
+- [Исходное ТЗ](Markdown%20Live%20Preview.pdf) · [Описание проекта](docs/PROJECT_SUMMARY.md) · [План и результаты проверок](docs/IMPLEMENTATION_PLAN.md)
+- [Запись работы приложения](docs/demo/software-rehearsal.mp4) · [Исходники ролика](docs/demo/sana-launch-ru-source.zip) · [Русские субтитры](docs/demo/SANA-Shield-RU.srt) · [Ранние версии презентации и ML-ролика](docs/demo/archive/)

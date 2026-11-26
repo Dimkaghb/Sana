@@ -134,11 +134,13 @@ The latest run passed 21 shared contract/window tests, 17 backend tests, seven M
 
 The population map was checked in desktop and phone-sized Chromium views against the local service feed. Selecting a labeled group opened all nine sessions counted by its label. The expanded map also opened an individual session dossier. First-time user comprehension still needs a usability check with participants.
 
-## Three-dimensional population view
+## Population map
 
 Verified the dashboard volume against the existing local rehearsal with 150 seeded sessions and one live submission. All 151 points received three PCA coordinates derived from their stored embeddings. The production build, 21 shared tests, 17 backend tests, seven ML tests and ten browser tests passed. The browser check exercised the live view at desktop and phone widths.
 
 The analyst now explores the three-dimensional projection from a first-person camera. The live rehearsal showed 18 numbered groups for 143 grouped sessions and listed eight ungrouped sessions separately. Selecting a group reveals its member sessions. At 1500 px and 390 px browser widths, all 18 overview markers were visible and individually selectable by center-point hit testing. The production build and all ten browser tests passed.
+
+The analyst map now opens on a 2D UMAP scatterplot. Each group links its dots to a size-ranked session list, with status filters and drilldown for coincident positions. The 3D PCA view remains available. Verified the production build, all 18 browser tests, and a live page of 152 sessions at 1360 px and 390 px widths.
 
 ## Analyst decision explanations
 

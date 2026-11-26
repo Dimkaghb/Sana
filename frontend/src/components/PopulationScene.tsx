@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowUp, ArrowDown, RotateCcw } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import type { MapStack } from "./PopulationMap";
 
 const home = { x: 0, y: 0, z: -2.8, yaw: 0, pitch: 0 };
@@ -63,17 +63,13 @@ function placeLabel(
 export function PopulationScene({
   stacks,
   overview,
-  heading,
   selected,
   onActivate,
-  onBack,
 }: {
   stacks: MapStack[];
   overview: boolean;
-  heading: string;
   selected?: string;
   onActivate: (marker: MapStack) => void;
-  onBack: () => void;
 }) {
   const id = useId();
   const canvas = useRef<SVGSVGElement>(null);
@@ -89,6 +85,8 @@ export function PopulationScene({
   useLayoutEffect(() => {
     const element = canvas.current;
     if (!element) return;
+    const { width, height } = element.getBoundingClientRect();
+    if (width && height) setSize({ width, height });
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       if (width && height) setSize({ width, height });
@@ -165,35 +163,9 @@ export function PopulationScene({
     })
     .sort((a, b) => b.depth - a.depth);
 
-  // Sparse floor guides continue through the viewport, giving depth without enclosing the cloud.
-  const floor: string[] = [];
-  function line(ax: number, az: number, bx: number, bz: number) {
-    const a = project(ax, -1.65, az),
-      b = project(bx, -1.65, bz);
-    if (a && b) floor.push(`M ${a.x} ${a.y} L ${b.x} ${b.y}`);
-  }
-  for (let i = -12; i <= 12; i += 2) {
-    for (let j = -12; j < 12; j += 2) {
-      line(i, j, i, j + 2);
-      line(j, i, j + 2, i);
-    }
-  }
   return (
     <div className="population-scene">
       <div className="population-scene-bar">
-        {overview ? (
-          <span>{heading}</span>
-        ) : (
-          <button
-            type="button"
-            onClick={onBack}
-            className="population-scene-back"
-            aria-label="Return to group overview"
-          >
-            <ArrowLeft size={14} />
-            {heading}
-          </button>
-        )}
         <div
           className="population-camera"
           role="group"
@@ -205,7 +177,7 @@ export function PopulationScene({
             aria-label="Move forward"
             title="Move forward (W)"
           >
-            <ArrowUp size={16} />
+            <ZoomIn size={16} />
           </button>
           <button
             type="button"
@@ -213,7 +185,7 @@ export function PopulationScene({
             aria-label="Move backward"
             title="Move backward (S)"
           >
-            <ArrowDown size={16} />
+            <ZoomOut size={16} />
           </button>
           <button
             type="button"
@@ -295,18 +267,6 @@ export function PopulationScene({
           e.preventDefault();
         }}
       >
-        <defs>
-          <radialGradient id={id + "-node"} cx="33%" cy="22%" r="85%">
-            <stop stopColor="#537e80" />
-            <stop offset=".56" stopColor="#305357" />
-            <stop offset="1" stopColor="#1b333a" />
-          </radialGradient>
-        </defs>
-        <path
-          d={floor.join(" ")}
-          className="population-floor"
-          aria-hidden="true"
-        />
         {markers.map(({ stack, x, y, depth }) => {
           const first = stack.sessions[0];
           const multi = stack.sessions.length > 1;
@@ -376,7 +336,6 @@ export function PopulationScene({
               <circle r={Math.max(radius + 3, 12)} fill="transparent" />
               <circle
                 r={radius}
-                style={overview ? { fill: `url(#${id}-node)` } : undefined}
                 className={
                   overview || multi
                     ? "population-node population-orb"

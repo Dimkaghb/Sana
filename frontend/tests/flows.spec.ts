@@ -259,6 +259,19 @@ test("population map separates overlapping sessions and supports keyboard explor
   page,
 }) => {
   await page.goto("/dashboard/map?mode=fixtures");
+  const flat = page.getByRole("group", { name: "Session similarity map" });
+  await flat
+    .getByRole("button", { name: "Explore Group 1, 5 sessions" })
+    .press("Enter");
+  await expect(
+    page
+      .getByRole("complementary", { name: "Behavior groups and sessions" })
+      .getByRole("listitem"),
+  ).toHaveCount(5);
+  await flat.getByRole("button", { name: "Inspect 5 overlapping sessions" }).press("Enter");
+  await expect(page.getByRole("heading", { name: "Overlapping sessions" })).toBeVisible();
+  await page.getByRole("button", { name: "Return to group overview" }).click();
+  await page.getByRole("button", { name: "3D view" }).click();
   const plot = page.getByRole("group", { name: "Behavioral similarity plot" });
   await expect(plot.getByRole("button")).toHaveCount(2);
   const group = plot.getByRole("button", {

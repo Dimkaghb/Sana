@@ -3,10 +3,8 @@ import {
   ArrowLeft,
   ArrowUpRight,
   ChevronRight,
-  Layers3,
   Maximize2,
   Minimize2,
-  Network,
 } from "lucide-react";
 import {
   decisionLabel,
@@ -15,6 +13,7 @@ import {
 } from "../types";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { SimilarityPlot } from "./SimilarityPlot";
 import { PopulationScene } from "./PopulationScene";
 import "./population-map.css";
 
@@ -35,7 +34,7 @@ function statusFor(status: string): MapStatus {
   return "Unverified";
 }
 
-type Session = Dot & {
+export type MapSession = Dot & {
   id: string;
   label: string;
   description?: string;
@@ -47,17 +46,17 @@ export type MapStack = {
   x: number;
   y: number;
   z: number;
-  sessions: Session[];
+  sessions: MapSession[];
 };
 
-function hasPosition(session: Session) {
+function hasPosition(session: MapSession) {
   return (
     session.position_3d?.length === 3 &&
     session.position_3d.every(Number.isFinite)
   );
 }
 
-function groupMarker(group: number, members: Session[]): MapStack[] {
+function groupMarker(group: number, members: MapSession[]): MapStack[] {
   const plotted = members.filter(hasPosition);
   if (group < 0 || !plotted.length) return [];
   const center = [0, 0, 0];
@@ -103,7 +102,7 @@ function collectSessions(data?: DashboardData) {
 
   return [...byId]
     .filter(([, dot]) => Number.isFinite(dot.x) && Number.isFinite(dot.y))
-    .map(([id, dot]): Session => {
+    .map(([id, dot]): MapSession => {
       const event = events.get(id);
       return {
         ...dot,
@@ -147,10 +146,12 @@ export function PopulationMap({
   const [filter, setFilter] = useState<MapStatus>();
   const [group, setGroup] = useState<number>();
   const [stackId, setStackId] = useState<string>();
+  const [projection, setProjection] = useState<"2D" | "3D">("2D");
+  const [highlighted, setHighlighted] = useState<number>();
   const visible = filter
     ? sessions.filter((session) => session.tone === filter)
     : sessions;
-  const groups = new Map<number, Session[]>();
+  const groups = new Map<number, MapSession[]>();
   for (const session of visible) {
     const members = groups.get(session.cluster_id) ?? [];
     members.push(session);
@@ -165,6 +166,7 @@ export function PopulationMap({
   const groupSessions = group === undefined ? undefined : groups.get(group);
   const overview = !groupSessions;
   const markers = (() => {
+    if (projection !== "3D") return [];
     if (!groupSessions)
       return groupRows.flatMap(([id, members]) => groupMarker(id, members));
     const locations = new Map<string, MapStack>();
@@ -178,15 +180,21 @@ export function PopulationMap({
     }
     return [...locations.values()];
   })();
-  const stackSessions = stackId
-    ? markers.find((marker) => marker.id === stackId)?.sessions
-    : undefined;
+  const stackSessions =
+    stackId === undefined
+      ? undefined
+      : projection === "3D"
+        ? markers.find((marker) => marker.id === stackId)?.sessions
+        : groupSessions?.filter((s) => [s.x, s.y].join(",") === stackId);
+  const groupTotal = groupRows.filter(([id]) => id >= 0).length;
   const detail = stackSessions ?? groupSessions;
   function openGroup(next?: number) {
+    setHighlighted(undefined);
     setStackId(undefined);
     setGroup(next);
   }
   function changeFilter(next?: MapStatus) {
+    setHighlighted(undefined);
     setStackId(undefined);
     if (next && !groupSessions?.some((session) => session.tone === next))
       setGroup(undefined);
@@ -205,27 +213,52 @@ export function PopulationMap({
   const header = (large: boolean) => (
     <header className="population-header">
       <div>
-        <h2 id={large ? undefined : "population-title"}>Embedding space</h2>
+        <h2 id={large ? undefined : "population-title"}>Session similarity</h2>
         <p>
-          Explore groups of transfers with similar interaction patterns. Select
-          a group to see its sessions.
+          {projection === "2D"
+            ? "Each dot is a session. Nearby dots suggest similar tapping, typing or swiping patterns."
+            : "Select a numbered group to explore its sessions in three dimensions."}
         </p>
       </div>
-      <span className="population-count">
-        <Network size={16} aria-hidden="true" />
-        {sessionCount(sessions.length)}
-      </span>
-      {large ? (
-        <Button variant="outline" size="sm" onClick={() => setExpanded(false)}>
-          <Minimize2 /> Collapse
-        </Button>
-      ) : (
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
-            <Maximize2 /> Expand
+      <div className="population-tools">
+        <div
+          className="population-switch"
+          role="group"
+          aria-label="Map projection"
+        >
+          {(["2D", "3D"] as const).map((mode) => (
+            <button
+              type="button"
+              key={mode}
+              aria-pressed={projection === mode}
+              onClick={() => {
+                setProjection(mode);
+                setStackId(undefined);
+                setHighlighted(undefined);
+              }}
+            >
+              {mode === "2D" ? "2D map" : "3D view"}
+            </button>
+          ))}
+        </div>
+        {large ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setExpanded(false)}
+          >
+            <Minimize2 />
+            <span className="sr-only">Collapse</span>
           </Button>
-        </DialogTrigger>
-      )}
+        ) : (
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="icon-sm" title="Expand">
+              <Maximize2 />
+              <span className="sr-only">Expand</span>
+            </Button>
+          </DialogTrigger>
+        )}
+      </div>
     </header>
   );
   const contents = !data ? (
@@ -239,19 +272,62 @@ export function PopulationMap({
           Skip to behavior groups
         </a>
         <div className="population-main">
-          <PopulationScene
-            key={overview ? "overview" : group}
-            stacks={markers}
-            onBack={() => openGroup(undefined)}
-            overview={overview}
-            heading={overview ? "Group overview" : groupLabel(group!)}
-            selected={selected}
-            onActivate={(marker) => {
-              if (overview) openGroup(Number(marker.id));
-              else if (marker.sessions.length > 1) setStackId(marker.id);
-              else inspect(marker.sessions[0]);
-            }}
-          />
+          <div className="population-plot-meta">
+            <span aria-live="polite">
+              {groupSessions ? (
+                <>
+                  <button
+                    type="button"
+                    className="population-back"
+                    aria-label="Return to group overview"
+                    onClick={() => openGroup()}
+                  >
+                    All groups
+                  </button>
+                  <ChevronRight size={13} />
+                  {groupLabel(group!)}
+                </>
+              ) : (
+                <>
+                  {groupTotal} {groupTotal === 1 ? "group" : "groups"}
+                </>
+              )}
+              <span className="population-total">
+                {sessionCount((groupSessions ?? visible).length)}
+              </span>
+            </span>
+          </div>
+          {projection === "2D" ? (
+            <SimilarityPlot
+              groups={groupRows}
+              group={overview ? undefined : group}
+              domain={
+                overview
+                  ? sessions
+                  : sessions.filter((s) => s.cluster_id === group)
+              }
+              highlighted={highlighted}
+              selected={selected}
+              onHighlight={setHighlighted}
+              onGroup={openGroup}
+              onInspect={(members) => {
+                if (members.length === 1) inspect(members[0]);
+                else setStackId([members[0].x, members[0].y].join(","));
+              }}
+            />
+          ) : (
+            <PopulationScene
+              key={overview ? "overview" : group}
+              stacks={markers}
+              overview={overview}
+              selected={selected}
+              onActivate={(marker) => {
+                if (overview) openGroup(Number(marker.id));
+                else if (marker.sessions.length > 1) setStackId(marker.id);
+                else inspect(marker.sessions[0]);
+              }}
+            />
+          )}
           <div
             className="population-legend"
             role="group"
@@ -284,21 +360,6 @@ export function PopulationMap({
               );
             })}
           </div>
-          <p className="population-note">
-            {overview
-              ? "Each number identifies a group at its average 3D position."
-              : "Color shows session status. A number marks sessions at the same position."}
-            {overview &&
-              groups.has(-1) &&
-              " Ungrouped sessions are listed separately."}
-            {sessions.some((s) => !s.position_3d) &&
-              " Sessions without 3D coordinates are available in the group list."}
-            {preview
-              ? " Showing synthetic fixtures."
-              : synthetic > 0
-                ? ` Seeded examples: ${synthetic}.`
-                : ""}
-          </p>
         </div>
         <aside
           id={browserId}
@@ -307,14 +368,13 @@ export function PopulationMap({
           aria-label="Behavior groups and sessions"
         >
           <div className="population-browser-head">
-            {detail && (
+            {stackSessions && (
               <button
                 type="button"
                 className="population-back"
-                onClick={() => openGroup(stackSessions ? group : undefined)}
+                onClick={() => openGroup(group)}
               >
-                <ArrowLeft size={14} aria-hidden="true" />{" "}
-                {stackSessions ? groupLabel(group!) : "All groups"}
+                <ArrowLeft size={14} aria-hidden="true" /> {groupLabel(group!)}
               </button>
             )}
             <h3>
@@ -322,14 +382,14 @@ export function PopulationMap({
                 ? "Overlapping sessions"
                 : groupSessions
                   ? groupLabel(group!)
-                  : "Behavior groups"}
+                  : "Groups"}
             </h3>
             <p aria-live="polite">
               {detail
-                ? `${sessionCount(detail.length)}. Select a session to inspect it.`
+                ? sessionCount(detail.length)
                 : groupRows.length
-                  ? "Choose a group to see its sessions."
-                  : "Sessions appear here when they have a map position."}
+                  ? "Bars show the status mix."
+                  : "No sessions match this filter."}
             </p>
             {group !== undefined && group >= 0 && ringGroups.has(group) && (
               <a
@@ -370,25 +430,49 @@ export function PopulationMap({
               ))}
             </ul>
           ) : (
-            <ul className="population-list">
-              {groupRows.map(([group, members]) => (
-                <li key={group}>
-                  <button type="button" onClick={() => openGroup(group)}>
-                    <span className="population-group-icon">
-                      {group < 0 ? (
-                        <Layers3 size={17} aria-hidden="true" />
-                      ) : (
-                        <span aria-hidden="true">{group}</span>
-                      )}
-                    </span>
+            <ul className="population-list population-groups">
+              {groupRows.map(([id, members]) => (
+                <li key={id}>
+                  <button
+                    type="button"
+                    onClick={() => openGroup(id)}
+                    data-highlighted={highlighted === id}
+                    onMouseEnter={() => setHighlighted(id)}
+                    onMouseLeave={() => setHighlighted(undefined)}
+                    onFocus={() => setHighlighted(id)}
+                    onBlur={() => setHighlighted(undefined)}
+                  >
                     <span>
-                      <strong>{groupLabel(group)}</strong>
-                      <small>{sessionCount(members.length)}</small>
-                      {group >= 0 && ringGroups.has(group) && (
+                      <strong>{groupLabel(id)}</strong>
+                      {id >= 0 && ringGroups.has(id) && (
                         <small aria-hidden="true">Suspected mule ring</small>
                       )}
                     </span>
-                    <ChevronRight size={16} aria-hidden="true" />
+                    <span className="population-composition" aria-hidden="true">
+                      {statuses.map((tone) => {
+                        const count = members.filter(
+                          (s) => s.tone === tone,
+                        ).length;
+                        return (
+                          count > 0 && (
+                            <i
+                              key={tone}
+                              data-tone={tone}
+                              style={{ flexGrow: count }}
+                              title={tone + " · " + count}
+                            />
+                          )
+                        );
+                      })}
+                    </span>
+                    <span className="population-group-size">
+                      {members.length}
+                      <span className="sr-only">
+                        {" "}
+                        {members.length === 1 ? "session" : "sessions"}
+                      </span>
+                    </span>
+                    <ChevronRight size={14} aria-hidden="true" />
                   </button>
                 </li>
               ))}
@@ -396,14 +480,33 @@ export function PopulationMap({
           )}
         </aside>
       </div>
-      <details className="population-guide">
-        <summary>How to read this map</summary>
-        <p>
-          A group can include different people with similar tapping, typing or
-          swiping patterns. Open a numbered group to inspect its sessions. Color
-          shows a session’s status.
-        </p>
-      </details>
+      <footer className="population-footer">
+        <details className="population-guide">
+          <summary>How to read this map</summary>
+          <p>
+            A group can include different people with similar interactions. In
+            2D, each dot represents a session. Sessions at identical coordinates
+            share a dot. Select a group to inspect its sessions. Hollow dots
+            have unverified status.
+          </p>
+          <p>
+            The 2D map uses UMAP. The 3D view uses a separate PCA projection,
+            with numbered markers at the average position of each group.
+            Sessions without 3D coordinates and ungrouped sessions remain in the
+            list.
+          </p>
+        </details>
+        {(preview || synthetic > 0) && (
+          <span className="population-note">
+            {preview
+              ? "Synthetic fixture data"
+              : synthetic +
+                (synthetic === 1
+                  ? " synthetic session"
+                  : " synthetic sessions")}
+          </span>
+        )}
+      </footer>
     </>
   );
   return (
