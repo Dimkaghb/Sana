@@ -52,6 +52,18 @@ class Settings:
         recoil = float(os.getenv("SANA_RECOIL_FLOOR", "0.08"))
         if not math.isfinite(recoil) or recoil <= 0:
             raise ValueError("SANA_RECOIL_FLOOR must be finite and positive")
+        policy = Policy(
+            version=os.getenv("SANA_POLICY_VERSION", "demo-1"),
+            recoil_floor=recoil,
+            hold_threshold=int(os.getenv("SANA_HOLD_THRESHOLD", "75")),
+            step_up_threshold=int(os.getenv("SANA_STEP_UP_THRESHOLD", "50")),
+            handoff_amount=int(os.getenv("SANA_HANDOFF_AMOUNT", "100000")),
+            ring_confidence=float(os.getenv("SANA_RING_CONFIDENCE", "0.80")),
+        )
+        if not (0 <= policy.step_up_threshold <= policy.hold_threshold <= 100
+                and 0 <= policy.ring_confidence <= 1 and policy.handoff_amount >= 0
+                and policy.version.strip()):
+            raise ValueError("Invalid demo risk policy thresholds or version")
         origins = tuple(
             x.strip()
             for x in os.getenv(
@@ -74,6 +86,6 @@ class Settings:
             admin,
             os.getenv("ML_ADMIN_TOKEN", ""),
             guardians,
-            Policy(recoil_floor=recoil),
+            policy,
             recording_dir,
         )
