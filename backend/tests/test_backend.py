@@ -259,6 +259,95 @@ class RuntimeTests(unittest.TestCase):
             self.assertEqual(fingerprint_requests, 1)
             self.assertEqual(ban_attempts, 2)
 
+    def test_analyst_attested_owner_enrollment(self):
+        confirmations = []
+        eligible = "owner-bootstrap"
+
+        def ml(request):
+            if request.url.path.endswith("enroll"):
+                self.assertEqual(
+                    request.headers["Authorization"], "Bearer upstream-test"
+                )
+                sid = request.url.path.split("/")[-2]
+                confirmations.append(sid)
+                return httpx.Response(
+                    200,
+                    json={
+                        "session_id": sid,
+                        "account_id": "acc_student_101",
+                        "baseline_sessions_count": 1,
+                    },
+                )
+            if request.url.path.endswith("ban"):
+                return httpx.Response(
+                    200, json={"operator_id": "op_demo_owner", "status": "confirmed"}
+                )
+            payload = json.loads(request.content)
+            result = fixture("normal", "ml-score")
+            result["session_id"] = payload["session_id"]
+            result["owner_verification"].update(
+                cosine_similarity=None, baseline_sessions_count=0
+            )
+            if payload["session_id"] == "unavailable-identity":
+                return httpx.Response(422)
+            return httpx.Response(200, json=result)
+
+        bridge = "/api/v1/sessions/{}/enroll"
+        config = Settings(
+            "live", self.db, admin_token="test-analyst", ml_token="upstream-test"
+        )
+        with TestClient(create_app(config, httpx.MockTransport(ml))) as c:
+            for sid, scenario in [
+                (eligible, "normal"),
+                ("unsafe", "synthetic_touch"),
+                ("no-motion", "missing_sensors"),
+                ("unavailable-identity", "normal"),
+            ]:
+                payload = fixture(scenario)
+                payload["session_id"] = sid
+                self.assertEqual(c.post(INGEST, json=payload).status_code, 200)
+            self.assertEqual(confirmations, [])
+            url = bridge.format(eligible)
+            attestation = {"owner_verified": True}
+            self.assertEqual(c.post(url, json=attestation).status_code, 403)
+            for body in (
+                {},
+                {"owner_verified": False},
+                {"owner_verified": 1},
+                {**attestation, "other": True},
+            ):
+                self.assertEqual(c.post(url, json=body, headers=ADMIN).status_code, 422)
+            self.assertEqual(
+                c.post(
+                    bridge.format("unknown"), json=attestation, headers=ADMIN
+                ).status_code,
+                404,
+            )
+            for sid in ("unsafe", "no-motion", "unavailable-identity"):
+                self.assertEqual(
+                    c.post(
+                        bridge.format(sid), json=attestation, headers=ADMIN
+                    ).status_code,
+                    409,
+                )
+            for _ in range(2):
+                confirmation = c.post(url, json=attestation, headers=ADMIN).json()
+                self.assertEqual(confirmation["baseline_sessions_count"], 1)
+            self.assertEqual(confirmations, [eligible])
+            dossier = c.get(
+                "/api/v1/cases/" + eligible + "/export-antifraud", headers=ADMIN
+            ).json()
+            self.assertEqual(dossier["enrollment"]["confirmation"], confirmation)
+            self.assertEqual(dossier["event"]["decision"], "STEP_UP_LIVENESS")
+            c.post("/api/v1/operators/op_demo_owner/ban", headers=ADMIN)
+            self.assertEqual(
+                c.post(url, json=attestation, headers=ADMIN).status_code, 409
+            )
+        with self.client() as c:
+            self.assertEqual(
+                c.post(url, json=attestation, headers=ADMIN).status_code, 409
+            )
+
     def test_per_session_calibration(self):
         with self.client() as c:
             url = "/api/v1/calibration/sessions"

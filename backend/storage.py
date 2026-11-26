@@ -74,6 +74,15 @@ class Store:
                 (value, session),
             )
 
+    def record_enrollment(self, session, confirmation):
+        with self.db:
+            self.db.execute(
+                """UPDATE sessions SET dossier=json_set(dossier,'$.enrollment',
+                json_object('verified_by','analyst','timestamp',strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                'confirmation',json(?))) WHERE id=?""",
+                (json.dumps(confirmation), session),
+            )
+
     def snapshot(self):
         rows = self.db.execute(
             "SELECT event FROM sessions ORDER BY rowid DESC LIMIT 200"

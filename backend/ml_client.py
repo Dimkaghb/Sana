@@ -53,6 +53,10 @@ def valid_population(result):
     return True
 
 
+class EnrollmentRefused(Exception):
+    """The identity service cannot enroll this recorded session."""
+
+
 class IdentityService:
     def __init__(self, config, client, checks):
         self.config = config
@@ -133,6 +137,38 @@ class IdentityService:
                 value = result.get("operator_fingerprint")
                 if isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value):
                     return value
+        except (
+            httpx.HTTPError,
+            ValueError,
+            TimeoutError,
+            RecursionError,
+            OverflowError,
+        ):
+            pass
+        return None
+
+    async def enroll(self, session, account):
+        try:
+            result = await self.request(
+                "POST",
+                f"/ml/sessions/{quote(session, safe='')}/enroll",
+                headers={"Authorization": f"Bearer {self.config.ml_token}"},
+            )
+            if (
+                isinstance(result, dict)
+                and result.get("session_id") == session
+                and result.get("account_id") == account
+                and type(result.get("baseline_sessions_count")) is int
+                and result["baseline_sessions_count"] > 0
+            ):
+                return {
+                    k: result[k]
+                    for k in ("session_id", "account_id", "baseline_sessions_count")
+                }
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (404, 409, 422):
+                raise EnrollmentRefused from exc
+            return None
         except (
             httpx.HTTPError,
             ValueError,

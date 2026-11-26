@@ -22,6 +22,9 @@ The mock identity service replays Contract B examples for the six labeled fixtur
 | `ML_ADMIN_TOKEN` | Server-side bearer for the separate ML admin API. Match the value configured in that process. |
 | `SANA_GUARDIAN_TOKENS` | JSON object mapping each demo account ID to its own bearer token. Give a Guardian only the token for their account. |
 | `SANA_RECOIL_FLOOR` | Positive low-recoil threshold in m/s². Default 0.08. Case exports record the settings used. |
+| `SANA_POLICY_VERSION` | Decision policy label, recorded alongside its concrete thresholds. Default `demo-1`. |
+| `SANA_HOLD_THRESHOLD`, `SANA_STEP_UP_THRESHOLD` | Scores from 0 to 100. Defaults 75 and 50. |
+| `SANA_HANDOFF_AMOUNT`, `SANA_RING_CONFIDENCE` | Defaults 100000 KZT and 0.80. |
 | `SANA_CALIBRATION_DIR` | Opt-in raw recording directory under the ignored `backend/data`. Unset disables recording. |
 
 Enter credentials through the relevant analyst or Guardian view. Keep the server-to-server ML credential on the laptop. Run the service on a private demo network. The dashboard is intended for all observers on that network. See [offline setup](../docs/OFFLINE_REHEARSAL.md) for real-phone HTTPS.
@@ -37,6 +40,8 @@ Enter credentials through the relevant analyst or Guardian view. Keep the server
 ## Operator and Guardian actions
 
 The mobile view connects to `/ws/mobile/{session_id}`. An authorized `POST /api/v1/demo/inject-rat-click` with a JSON `session_id` sends `INJECT_RAT_CLICK` to that specific connected phone. The backend waits for normal client collection and submission to produce an assessment.
+
+After independently verifying the owner of a specific live session, an authorized analyst can submit `POST /api/v1/sessions/{session_id}/enroll` with `{"owner_verified":true}`. The backend requires observed low-risk physics and coercion scores, a live identity point, no risk flags except an unavailable owner baseline, and no operator ban request. It records the ML-confirmed enrollment in the case dossier. An identical retry returns the same confirmation. Each participant's first three verified sessions establish the initial owner baseline for future transfers.
 
 An authorized `POST /api/v1/operators/{operator_id}/ban` records pending, failed or confirmed status. A successful live response requires ML confirmation. Retrying a confirmed ban is idempotent. Download a simulated case through `GET /api/v1/cases/{session_id}/export-antifraud`. When the live identity service supplies a SHA-256 fingerprint of the full stored session vector, the dossier includes and caches it. Subsequent recordings from the same operator can have different fingerprints.
 

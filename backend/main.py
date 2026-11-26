@@ -26,9 +26,9 @@ from scripts.validate_contracts import (
 from .calibration import save_recording
 from .coercion_engine import analyze_coercion
 from .config import Settings
-from .ml_client import IdentityService
+from .ml_client import EnrollmentRefused, IdentityService
 from .physics_engine import analyze_tap_recoil, flag
-from .risk_fusion import decide
+from .risk_fusion import decide, eligible_for_enrollment
 from .storage import Store
 
 BODY_LIMIT = 1_048_576
@@ -348,6 +348,54 @@ def create_app(settings=None, transport=None):
                 "Content-Disposition": f'attachment; filename="sana-{dossier["case_id"]}.json"'
             },
         )
+
+    @app.post("/api/v1/sessions/{session}/enroll")
+    async def enroll(session: str, request: Request):
+        admin(request)
+        body = await read_json(request, 1024)
+        if (
+            not isinstance(body, dict)
+            or set(body) != {"owner_verified"}
+            or body["owner_verified"] is not True
+        ):
+            raise HTTPException(
+                422, "Explicit verification of this session's owner is required"
+            )
+        state = app.state
+        async with state.lock:
+            row = state.store.session(session)
+            if not row:
+                raise HTTPException(404, "Session not found")
+            dossier = json.loads(row["dossier"])
+            event = dossier["event"]
+            if state.config.mode != "live" or dossier["ml_mode"] != "live":
+                raise HTTPException(
+                    409, "Owner enrollment requires a live identity session"
+                )
+            if not eligible_for_enrollment(
+                event, dossier["policy"]["step_up_threshold"]
+            ):
+                raise HTTPException(
+                    409,
+                    "Session has insufficient or conflicting evidence for enrollment",
+                )
+            operator = event["map_point"]["operator_id"]
+            if state.store.ban_status(operator, "live") is not None:
+                raise HTTPException(
+                    409, "An operator ban was requested for this identity"
+                )
+            if "enrollment" in dossier:
+                return dossier["enrollment"]["confirmation"]
+            try:
+                confirmation = await state.ml.enroll(session, row["account"])
+            except EnrollmentRefused:
+                raise HTTPException(
+                    409, "Identity service declined this enrollment"
+                ) from None
+            if not confirmation:
+                raise HTTPException(502, "Identity service did not confirm enrollment")
+            state.store.record_enrollment(session, confirmation)
+            return confirmation
 
     @app.post("/api/v1/operators/{operator}/ban")
     async def ban(operator: str, request: Request):

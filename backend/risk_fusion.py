@@ -87,3 +87,22 @@ def decide(telemetry, recoil: Evidence, coercion: Evidence, ml, policy: Policy):
     else:
         decision = "SUCCESS"
     return decision, scores, overall, flags
+
+
+def eligible_for_enrollment(event, step_up_threshold):
+    # Cold owner identity is expected for first-time enrollment. Both physical
+    # components must be observed and the historical result must be otherwise clean.
+    physical_scores = (
+        event["scores"]["anti_rat_physics_risk"],
+        event["scores"]["coercion_stress_risk"],
+    )
+    return (
+        event["decision"] != "MIRAGE_HOLD"
+        and event["map_point"] is not None
+        and all(
+            score is not None and score < step_up_threshold for score in physical_scores
+        )
+        and event["overall_risk_score"] is not None
+        and event["overall_risk_score"] < step_up_threshold
+        and all(flag["code"] == "IDENTITY_UNAVAILABLE" for flag in event["flags"])
+    )
