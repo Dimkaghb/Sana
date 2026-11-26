@@ -361,3 +361,29 @@
     inset: auto auto 8px 8px;
   }
 }
+
+.population-count {
+  margin-inline-start: auto;
+}
+.population-expanded[role="dialog"] {
+  width: calc(100vw - 24px);
+  max-width: 1750px;
+  max-height: 94dvh;
+  overflow: auto;
+  background: var(--panel);
+}
+.population-expanded .population-canvas {
+  height: clamp(250px, 58dvh, 850px);
+}
+.population-guide {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.population-guide summary {
+  cursor: pointer;
+}
+.population-guide p {
+  max-width: 72ch;
+  margin-top: 6px;
+}

@@ -1850,10 +1850,6 @@ body {
   margin-top: 12px;
   font-size: 12px;
 }
-.projection-name {
-  color: var(--muted);
-  font-size: 12px;
-}
 .bars i.SUCCESS,
 .chart-key i:first-child {
   background: var(--success);

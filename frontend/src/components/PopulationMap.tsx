@@ -4,6 +4,8 @@ import {
   ArrowUpRight,
   ChevronRight,
   Layers3,
+  Maximize2,
+  Minimize2,
   Network,
 } from "lucide-react";
 import {
@@ -11,6 +13,8 @@ import {
   type DashboardData,
   type DashboardEvent,
 } from "../types";
+import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { PopulationScene } from "./PopulationScene";
 import "./population-map.css";
 
@@ -124,14 +128,21 @@ export function PopulationMap({
   data,
   selected,
   preview,
+  unavailable,
   onSelect,
 }: {
   data?: DashboardData;
   selected?: string;
   preview: boolean;
+  unavailable: boolean;
   onSelect: (dot: SelectedDot) => void;
 }) {
   const browserId = useId();
+  const [expanded, setExpanded] = useState(false);
+  function inspect(dot: SelectedDot) {
+    setExpanded(false);
+    onSelect(dot);
+  }
   const sessions = useMemo(() => collectSessions(data), [data]);
   const [filter, setFilter] = useState<MapStatus>();
   const [group, setGroup] = useState<number>();
@@ -183,24 +194,38 @@ export function PopulationMap({
   }
   const synthetic = sessions.filter((session) => session.synthetic).length;
 
-  return (
-    <section
-      className="panel population-panel"
-      aria-labelledby="population-title"
-    >
-      <header className="population-header">
-        <div>
-          <h2 id="population-title">Embedding space</h2>
-          <p>
-            Explore groups of transfers with similar interaction patterns.
-            Select a group to see its sessions.
-          </p>
-        </div>
-        <span className="population-count">
-          <Network size={16} aria-hidden="true" />
-          {sessionCount(sessions.length)}
-        </span>
-      </header>
+  const header = (large: boolean) => (
+    <header className="population-header">
+      <div>
+        <h2 id={large ? undefined : "population-title"}>Embedding space</h2>
+        <p>
+          Explore groups of transfers with similar interaction patterns. Select
+          a group to see its sessions.
+        </p>
+      </div>
+      <span className="population-count">
+        <Network size={16} aria-hidden="true" />
+        {sessionCount(sessions.length)}
+      </span>
+      {large ? (
+        <Button variant="outline" size="sm" onClick={() => setExpanded(false)}>
+          <Minimize2 /> Collapse
+        </Button>
+      ) : (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Maximize2 /> Expand
+          </Button>
+        </DialogTrigger>
+      )}
+    </header>
+  );
+  const contents = !data ? (
+    <p role="status">
+      {unavailable ? "Map service unavailable" : "Loading map…"}
+    </p>
+  ) : (
+    <>
       <div className="population-layout">
         <a className="population-skip" href={`#${browserId}`}>
           Skip to behavior groups
@@ -216,7 +241,7 @@ export function PopulationMap({
             onActivate={(marker) => {
               if (overview) openGroup(Number(marker.id));
               else if (marker.sessions.length > 1) setStackId(marker.id);
-              else onSelect(marker.sessions[0]);
+              else inspect(marker.sessions[0]);
             }}
           />
           <div
@@ -303,7 +328,7 @@ export function PopulationMap({
             <ul className="population-list">
               {detail.map((session) => (
                 <li key={session.id}>
-                  <button type="button" onClick={() => onSelect(session)}>
+                  <button type="button" onClick={() => inspect(session)}>
                     <i
                       className="population-status"
                       data-tone={session.tone}
@@ -350,7 +375,37 @@ export function PopulationMap({
           )}
         </aside>
       </div>
-    </section>
+      <details className="population-guide">
+        <summary>How to read this map</summary>
+        <p>
+          A group can include different people with similar tapping, typing or
+          swiping patterns. Open a numbered group to inspect its sessions. Color
+          shows a session’s status.
+        </p>
+      </details>
+    </>
+  );
+  return (
+    <Dialog open={expanded} onOpenChange={setExpanded}>
+      <section
+        className="panel population-panel"
+        aria-labelledby="population-title"
+      >
+        {header(false)}
+        {!expanded && contents}
+      </section>
+      {expanded && (
+        <DialogContent
+          className="population-panel population-expanded"
+          showCloseButton={false}
+          aria-describedby={undefined}
+        >
+          <DialogTitle className="sr-only">Expanded population map</DialogTitle>
+          {header(true)}
+          {contents}
+        </DialogContent>
+      )}
+    </Dialog>
   );
 }
 

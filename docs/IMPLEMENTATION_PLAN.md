@@ -132,6 +132,8 @@ The browser SDK now pairs capped pointer down/up observations with a whitelisted
 
 The latest run passed 21 shared contract/window tests, 17 backend tests, seven ML tests and nine browser tests, plus the seven-scenario HTTP/WebSocket rehearsal and the live enrollment, ring and ban check. Database evidence comes from local SQLite and embedded Qdrant. Deployment capacity, physical handset performance and participant accuracy still need measurements.
 
+The population map was checked in desktop and phone-sized Chromium views against the local service feed. Selecting a labeled group opened all nine sessions counted by its label. The expanded map also opened an individual session dossier. First-time user comprehension still needs a usability check with participants.
+
 ## Three-dimensional population view
 
 Verified the dashboard volume against the existing local rehearsal with 150 seeded sessions and one live submission. All 151 points received three PCA coordinates derived from their stored embeddings. The production build, 21 shared tests, 17 backend tests, seven ML tests and ten browser tests passed. The browser check exercised the live view at desktop and phone widths.

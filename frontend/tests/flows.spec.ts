@@ -587,3 +587,28 @@ test("Guardian device alerts require opt-in and can be disabled", async ({
   ).toBeVisible();
   expect(enabled).toBe(false);
 });
+
+test("expanded population map retains group selection and opens the session dossier", async ({
+  page,
+}) => {
+  await page.goto("/dashboard/map?mode=fixtures");
+  await page.getByText("How to read this map", { exact: true }).click();
+  await expect(
+    page.getByText(/A group can include different people/),
+  ).toBeVisible();
+  const expand = page.getByRole("button", { name: "Expand", exact: true });
+  await expand.click();
+  const map = page.getByRole("dialog", { name: "Expanded population map" });
+  await map.getByRole("button", { name: "Normal 1" }).click();
+  await map
+    .getByRole("button", { name: "Group 1 1 session", exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  await expect(expand).toBeFocused();
+  await expand.click();
+  await map.getByRole("button", { name: /sess_fixture_normal/ }).click();
+  await expect(
+    page.getByText("OPERATOR DOSSIER", { exact: true }),
+  ).toBeVisible();
+  await expect(map).toHaveCount(0);
+});
