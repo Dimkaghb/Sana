@@ -1,6 +1,7 @@
 """Versioned decision policy for simulated transfers."""
 
 from .config import Policy
+from .decision_explainer import add_evidence
 from .physics_engine import Evidence, flag
 
 
@@ -25,7 +26,10 @@ def local_hold_reasons(context, recoil, coercion, policy):
     return reasons
 
 
-def decide(telemetry, recoil: Evidence, coercion: Evidence, ml, policy: Policy, review=None):
+def decide(
+    telemetry, recoil: Evidence, coercion: Evidence, ml, policy: Policy, review=None,
+    *, identity_timed_out=False,
+):
     context = telemetry["transfer_context"]
     flags = [*recoil.flags, *coercion.flags]
     owner = ml["owner_verification"] if ml else {}
@@ -89,8 +93,10 @@ def decide(telemetry, recoil: Evidence, coercion: Evidence, ml, policy: Policy, 
     overall = max((s for s in scores.values() if s is not None), default=None)
     reasons = []
     if banned:
-        reasons.append(reason("BANNED_OPERATOR", "Match to a banned operator profile",
-                              f"The identity service matched the session to {operator['matched_operator_id']}, which was banned when this transfer was scored."))
+        profile = operator["matched_operator_id"]
+        match = f" at {confidence:.4f} cosine similarity" if confidence is not None else ""
+        detail = f"The session matched banned operator profile {profile}{match}. A banned-profile match triggers a hold."
+        reasons.append(reason("BANNED_OPERATOR", "Match to a banned operator profile", detail))
     if ring:
         reasons.append(reason("CROSS_ACCOUNT_MATCH", "Similar behavior across accounts",
                               f"The operator match score was {confidence:.3f} across {operator['ring_size']} linked accounts. The hold rule requires at least two accounts and a score of {policy.ring_confidence:g} or higher."))
@@ -122,7 +128,11 @@ def decide(telemetry, recoil: Evidence, coercion: Evidence, ml, policy: Policy, 
             decision = "SUCCESS"
             reasons.append(reason("BELOW_REVIEW_THRESHOLD", "Transfer met the approval rules",
                                   f"No hold rule applied. The highest available component scored {overall}/100, below the additional-check threshold of {policy.step_up_threshold}."))
-    return decision, scores, overall, flags, {"policy_version": policy.version, "reasons": reasons}
+    explanation = add_evidence(
+        {"policy_version": policy.version, "reasons": reasons},
+        telemetry, recoil, coercion, ml, policy, scores, review, identity_timed_out,
+    )
+    return decision, scores, overall, flags, explanation
 
 
 def eligible_for_enrollment(event, step_up_threshold):

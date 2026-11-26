@@ -47,3 +47,9 @@ Record device, OS/browser, measured sampling rate, missing-sensor behavior, tap 
 ## Linked account freeze rehearsal
 
 Open the authenticated analyst dashboard after the identity service records a qualifying cross-account match. The **Suspected mule rings** panel shows the operator, linked accounts, cosine match, and simulated held amount. Select **Freeze Linked Accounts**, check the account list, and confirm. The counter then counts the frozen ring transfers, including subsequent attempts from accounts in review. The fixture dashboard includes a read-only example. To exercise the full action on isolated data, run `backend/.venv/bin/python -m scripts.check_live` from the repository root.
+
+## Live Telemetry X-Ray rehearsal
+
+1. Open **Telemetry X-Ray → Show live signals** in the analyst dashboard. On the signed-in phone, enable **Показать аналитику сигналы этого перевода в реальном времени** before activating transfer protection. Approve sensor access and select that phone session on the analyst screen.
+2. Hold the phone, enter fictional digits, and pause between two groups. The analyst can watch the latest tap window and the spacing of the key presses. Drag across the confirmation slider to show the path and speed. After submission, the chart keeps the last received samples and shows any scored recoil flag when the decision arrives.
+3. For a repeatable comparison, run **Replay handheld fixture** and **Replay synthetic-touch fixture** in the analyst display. Repeat a measured transfer with the phone on a table only as a demonstration of how support changes motion. Hardware and sensor coverage affect the result, and weak recoil alone does not establish remote control.

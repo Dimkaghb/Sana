@@ -1905,12 +1905,45 @@ body {
   margin-bottom: 12px;
   overflow-wrap: anywhere;
 }
-.decision-explanation h3 { font-size: 15px; line-height: 1.35; }
-.decision-explanation ul { list-style: none; padding: 0; margin: 10px 0; }
-.decision-explanation li + li { margin-top: 9px; }
-.decision-explanation strong { font-size: 13px; }
-.decision-explanation p { margin: 3px 0; font-size: 13px; line-height: 1.5; }
-.decision-explanation small { font-size: 11px; color: var(--muted); }
+.decision-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.decision-explanation h3 { font-size: 17px; line-height: 1.35; }
+.decision-explanation h4 { margin-top: 5px; font-size: 13px; font-weight: 650; }
+.decision-explanation p { margin: 4px 0; font-size: 13px; line-height: 1.5; }
+.decision-explanation small, .decision-explanation .decision-source { color: var(--muted); font-size: 11px; }
+.decision-triggers { list-style: none; padding: 0; margin: 11px 0; }
+.decision-triggers li + li { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+.decision-triggers strong { font-size: 13px; }
+.decision-links { display: flex; flex-wrap: wrap; gap: 5px 9px; font-size: 11px; }
+.decision-links span { color: var(--muted); }
+.decision-links a { text-decoration: underline; text-underline-offset: 2px; }
+.decision-observation {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  scroll-margin-block: 12px;
+}
+.decision-observation:target { outline: 2px solid var(--accent); }
+.decision-observation h5 { margin: 0; font-size: 13px; }
+.decision-observation h5 small { margin-inline-start: 8px; }
+.decision-observation dl { display: grid; gap: 5px; margin: 7px 0 0; }
+.decision-observation dl > div {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) minmax(0, 1.35fr);
+  gap: 8px;
+  font-size: 12px;
+}
+.decision-observation dt { color: var(--muted); }
+.decision-observation dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 550; }
+.decision-support { margin-block: 10px; font-size: 12px; }
+.decision-support summary { cursor: pointer; }
 
 .bars i.STEALTH_HOLD, .chart-key i:nth-child(4), .decision-strip .STEALTH_HOLD {
   background: #ae72b1;
@@ -1926,3 +1959,11 @@ body {
 .guardian-device { margin-block: 12px; }
 .guardian-device small { display: block; color: var(--muted); margin: 4px 0; }
 .phone:has(.receipt) .scenario-picker { display: none; }
+
+.xray-opt-in {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0;
+  line-height: 1.45;
+}

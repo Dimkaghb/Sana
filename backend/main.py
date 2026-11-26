@@ -36,6 +36,7 @@ from .ml_client import EnrollmentRefused, IdentityService
 from .physics_engine import analyze_tap_recoil, flag
 from .risk_fusion import decide, eligible_for_enrollment, local_hold_reasons
 from .storage import Store
+from .xray import parse_frame
 
 BODY_LIMIT = 1_048_576
 LOCAL_HOLD_IDENTITY_BUDGET = 0.075
@@ -112,6 +113,7 @@ def create_app(settings=None, transport=None):
         state.identity_access = IdentityAccess()
         state.dashboard = set()
         state.phones = {}
+        state.xray_viewers = {}
         state.guardians = {}
         try:
             async with httpx.AsyncClient(
@@ -246,9 +248,9 @@ def create_app(settings=None, transport=None):
             db.execute(
                 "DELETE FROM login_sessions WHERE digest=?", (accounts.digest(token),)
             )
-        sockets = (
-            app.state.dashboard if role == "analyst" else app.state.phones.values()
-        )
+        sockets = set(app.state.phones.values())
+        if role == "analyst":
+            sockets = app.state.dashboard.union(*app.state.xray_viewers.values())
         for ws in tuple(sockets):
             if token and ws.cookies.get(cookie) == token:
                 await ws.close(code=1008)
@@ -403,7 +405,8 @@ def create_app(settings=None, transport=None):
             if mode == "mock" and state.store.ban_status(op_id, mode) == "confirmed":
                 operator["is_banned_operator"] = True
             outcome, scores, overall, flags, explanation = decide(
-                telemetry, recoil, coercion, ml, policy, review
+                telemetry, recoil, coercion, ml, policy, review,
+                identity_timed_out=missed_deadline,
             )
             if missed_deadline:
                 flags.append(
@@ -808,10 +811,55 @@ def create_app(settings=None, transport=None):
         try:
             await ws.accept()
             await notify({"type": "DASHBOARD_REFRESH"})
-            await listen(ws)
+            # A small token bucket allows the publisher's final flush beside a
+            # scheduled batch while bounding steady-state relay work.
+            tokens = 3.0
+            updated = time.monotonic()
+            while True:
+                message = await ws.receive()
+                if message["type"] == "websocket.disconnect":
+                    break
+                now = time.monotonic()
+                tokens = min(3.0, tokens + (now - updated) * 10)
+                updated = now
+                if tokens < 1:
+                    continue
+                tokens -= 1
+                viewers = app.state.xray_viewers.get(session)
+                if not viewers or not identity(ws, "mobile"):
+                    continue
+                frame = parse_frame(message.get("text"))
+                if frame is None:
+                    continue
+                await broadcast({viewer for viewer in viewers if identity(viewer, "analyst")}, frame)
         finally:
             phones.pop(session, None)
+            viewers = app.state.xray_viewers.pop(session, None)
+            if viewers:
+                await broadcast({viewer for viewer in viewers if identity(viewer, "analyst")}, {"type": "XRAY_ENDED"})
             await notify({"type": "DASHBOARD_REFRESH"})
+
+    @app.websocket("/ws/xray/{session}")
+    async def xray_ws(ws: WebSocket, session: str):
+        if not allowed(ws) or not identity(ws, "analyst") or session not in app.state.phones:
+            await ws.close(code=1008)
+            return
+        viewers = app.state.xray_viewers.setdefault(session, set())
+        await ws.accept()
+        viewers.add(ws)
+        try:
+            while identity(ws, "analyst"):
+                try:
+                    await asyncio.wait_for(listen(ws), 30)
+                    break
+                except TimeoutError:
+                    continue
+            else:
+                await ws.close(code=1008)
+        finally:
+            viewers.discard(ws)
+            if not viewers and app.state.xray_viewers.get(session) is viewers:
+                app.state.xray_viewers.pop(session, None)
 
     return app
 

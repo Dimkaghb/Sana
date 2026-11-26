@@ -15,7 +15,13 @@ export interface DashboardEvent {
   decision: Decision["ui_mode"];
   decision_explanation?: {
     policy_version: string;
-    reasons: { code: string; title: string; detail: string }[];
+    reasons: {
+      code: string;
+      title: string;
+      detail: string;
+      evidence_ids?: string[];
+    }[];
+    evidence?: DecisionEvidence[];
   };
   overall_risk_score: number | null;
   scores: {
@@ -26,6 +32,13 @@ export interface DashboardEvent {
   flags: { code: string; severity: string; title: string; detail: string }[];
   recoil_waveform: { t_ms: number; az_delta: number }[];
   map_point: MapPoint | null;
+}
+export interface DecisionEvidence {
+  id: string;
+  title: string;
+  status: "observed" | "unavailable";
+  summary: string;
+  facts: { label: string; value: string }[];
 }
 export interface DashboardData {
   events: DashboardEvent[];

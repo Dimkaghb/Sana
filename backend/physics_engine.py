@@ -42,6 +42,7 @@ def analyze_tap_recoil(payload, policy: Policy) -> Evidence:
     times = [s["t_ms"] for s in samples]
     result = Evidence()
     covered = 0
+    weak_taps = 0
     latest_covered = None
     slider_cv = slider_uniformity(payload["slider_trace"])
     taps = payload["taps"]
@@ -65,6 +66,7 @@ def analyze_tap_recoil(payload, policy: Policy) -> Evidence:
         covered += 1
         latest_covered = at
         weak = peak < policy.recoil_floor
+        weak_taps += int(weak)
         suspect_event = not tap["is_trusted"]
         empty_contact = tap["radius_x"] == tap["radius_y"] == 0
         score = 0
@@ -85,7 +87,8 @@ def analyze_tap_recoil(payload, policy: Policy) -> Evidence:
             {"t_ms": s["t_ms"] - at, "az_delta": s["az"] - rest} for s in window
         ]
         result.measurements.update(
-            peak_m_s2=peak, tap_ms=at, is_trusted=tap["is_trusted"]
+            peak_m_s2=peak, tap_ms=at, is_trusted=tap["is_trusted"],
+            zero_contact_geometry=empty_contact,
         )
         if weak:
             result.flags = [
@@ -98,7 +101,11 @@ def analyze_tap_recoil(payload, policy: Policy) -> Evidence:
             ]
         else:
             result.flags = []
-    result.measurements.update(covered_taps=covered, total_taps=len(payload["taps"]))
+    result.measurements.update(
+        covered_taps=covered, total_taps=len(taps), weak_taps=weak_taps,
+        final_tap_covered=bool(taps and latest_covered == taps[-1]["t_ms"]),
+        motion_samples=len(samples),
+    )
     if (
         taps
         and latest_covered != taps[-1]["t_ms"]

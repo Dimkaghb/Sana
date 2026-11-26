@@ -51,6 +51,7 @@ import { DecisionExplanation } from "../components/DecisionExplanation";
 import { FraudRings } from "../components/FraudRings";
 import { AccountDirectory } from "../components/AccountDirectory";
 import { ActivityChart, Signals } from "../components/Signals";
+import { TelemetryXRay } from "../components/TelemetryXRay";
 import { Theme } from "../components/Theme";
 import { signOut } from "../components/WorkspaceAccess";
 import { Brand } from "../components/Brand";
@@ -483,6 +484,9 @@ export function Dashboard({ alias }: { alias?: string }) {
           </div>
         )}
         {view === "queue" && <ActivityChart events={events} />}
+        {(view === "queue" || view === "signals") && (
+          <TelemetryXRay active={active} events={events} preview={preview} />
+        )}
         {view === "queue" && !!data?.rings?.length && (
           <FraudRings
             rings={data.rings}
@@ -657,7 +661,7 @@ export function Dashboard({ alias }: { alias?: string }) {
                   <DecisionExplanation event={current} preview={preview} />
                 )}
                 <div className="score-head">
-                  <span>Risk score</span>
+                  <span>Highest component score</span>
                   <strong>
                     {current?.overall_risk_score ?? "—"}
                     <small>/100</small>
@@ -681,12 +685,6 @@ export function Dashboard({ alias }: { alias?: string }) {
                         <b
                           style={{
                             width: (score ?? 0) + "%",
-                            background:
-                              score != null && score >= 75
-                                ? "var(--critical)"
-                                : score != null && score >= 50
-                                  ? "var(--warning)"
-                                  : undefined,
                           }}
                         />
                       </i>
@@ -696,12 +694,14 @@ export function Dashboard({ alias }: { alias?: string }) {
                 <Waveform event={current} />
                 {current && (
                   <>
-                    <div className="evidence-operator">
-                      <span>Matched operator</span>
-                      <code>
-                        {current.map_point?.operator_id || "Unavailable"}
-                      </code>
-                    </div>
+                    {!current.decision_explanation?.evidence && (
+                      <div className="evidence-operator">
+                        <span>Matched operator</span>
+                        <code>
+                          {current.map_point?.operator_id || "Unavailable"}
+                        </code>
+                      </div>
+                    )}
                     <Button
                       className="dossier-link"
                       onClick={() => inspect(current)}
@@ -874,7 +874,7 @@ export function Dashboard({ alias }: { alias?: string }) {
                         {preview || data?.ml_mode === "mock"
                           ? "Fixture match"
                           : "Operator match"}{" "}
-                        · {Math.round(confidence * 100)}%
+                        · {confidence.toFixed(4)} cosine similarity
                       </p>
                     )}
                   </div>
@@ -885,12 +885,20 @@ export function Dashboard({ alias }: { alias?: string }) {
                     preview={preview}
                   />
                 )}
-                {selectedEvent?.flags.map((f) => (
-                  <div className="flag" key={f.code}>
-                    <b>{f.title}</b>
-                    <p>{f.detail}</p>
-                  </div>
-                ))}
+                {!!selectedEvent?.recoil_waveform.length && (
+                  <Waveform event={selectedEvent} />
+                )}
+                {!!selectedEvent?.flags.length && (
+                  <details className="decision-support">
+                    <summary>Recorded flags</summary>
+                    {selectedEvent.flags.map((f) => (
+                      <div className="flag" key={f.code}>
+                        <b>{f.title}</b>
+                        <p>{f.detail}</p>
+                      </div>
+                    ))}
+                  </details>
+                )}
                 {!selectedEvent?.flags.length && (
                   <p>No session flags available.</p>
                 )}

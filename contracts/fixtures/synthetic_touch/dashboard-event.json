@@ -6,27 +6,172 @@
   "account_label": "Demo account 101",
   "decision": "MIRAGE_HOLD",
   "decision_explanation": {
-    "policy_version": "demo-2",
+    "policy_version": "demo-3",
     "reasons": [
       {
         "code": "TOUCH_HOLD",
         "title": "Tap evidence triggered a hold",
-        "detail": "Touch physics scored 98/100 against a hold threshold of 75."
+        "detail": "Touch physics scored 100/100 against a hold threshold of 75. Peak motion around the scored tap was 0.0000 m/s².",
+        "evidence_ids": [
+          "touch"
+        ]
+      }
+    ],
+    "evidence": [
+      {
+        "id": "touch",
+        "title": "Tap recoil and browser input",
+        "summary": "The tap used for scoring had weak motion along the screen's Z axis. A supported phone can also show weak recoil.",
+        "status": "observed",
+        "facts": [
+          {
+            "label": "Covered taps",
+            "value": "7 of 7"
+          },
+          {
+            "label": "Low recoil taps",
+            "value": "7"
+          },
+          {
+            "label": "Selected Z peak",
+            "value": "0 m/s²"
+          },
+          {
+            "label": "Low recoil cutoff",
+            "value": "0.08 m/s²"
+          },
+          {
+            "label": "Selected tap time",
+            "value": "500 ms into session"
+          },
+          {
+            "label": "Pointer provenance",
+            "value": "Script-generated or otherwise untrusted"
+          },
+          {
+            "label": "Contact geometry",
+            "value": "Zero radius on both axes"
+          },
+          {
+            "label": "Slider speed variation",
+            "value": "0.0% (uniform below 2.5%)"
+          },
+          {
+            "label": "Final tap coverage",
+            "value": "Covered"
+          }
+        ]
+      },
+      {
+        "id": "cadence",
+        "title": "Keypad timing",
+        "summary": "No sequence of three qualifying digit bursts was recorded.",
+        "status": "observed",
+        "facts": [
+          {
+            "label": "Complete key presses",
+            "value": "6"
+          },
+          {
+            "label": "Pattern rule",
+            "value": "2–4 digits per burst, <300 ms within a burst, >900 ms between bursts"
+          }
+        ]
+      },
+      {
+        "id": "motion",
+        "title": "Device movement",
+        "summary": "The motion check looked for repeated changes in device angle and energy in the 8–12 Hz band. Device movement can have ordinary causes.",
+        "status": "observed",
+        "facts": [
+          {
+            "label": "Motion window",
+            "value": "4.50 s"
+          },
+          {
+            "label": "Band energy",
+            "value": "0.0% of 1–16 Hz energy fell within 8–12 Hz"
+          },
+          {
+            "label": "Acceleration RMS",
+            "value": "0.0000 m/s²"
+          },
+          {
+            "label": "Tremor band rule",
+            "value": "Below criteria"
+          },
+          {
+            "label": "Posture transitions",
+            "value": "0"
+          }
+        ]
+      },
+      {
+        "id": "operator",
+        "title": "Behavioral operator match",
+        "summary": "The vector search returned a similar behavioral profile. A profile can include more than one account.",
+        "status": "observed",
+        "facts": [
+          {
+            "label": "Profile ID",
+            "value": "op_demo_owner"
+          },
+          {
+            "label": "Cosine similarity",
+            "value": "0.9300"
+          },
+          {
+            "label": "Other linked accounts",
+            "value": "0"
+          }
+        ]
+      },
+      {
+        "id": "owner",
+        "title": "Account owner comparison",
+        "summary": "The transfer was compared with this account's enrolled owner baseline.",
+        "status": "observed",
+        "facts": [
+          {
+            "label": "Enrolled sessions",
+            "value": "7"
+          },
+          {
+            "label": "Owner cosine similarity",
+            "value": "0.9400"
+          }
+        ]
+      },
+      {
+        "id": "transfer",
+        "title": "Transfer context",
+        "summary": "The hold policy considers recipient history and amount for specific rules.",
+        "status": "observed",
+        "facts": [
+          {
+            "label": "Recipient",
+            "value": "New"
+          },
+          {
+            "label": "Amount",
+            "value": "₸ 450,000.00"
+          }
+        ]
       }
     ]
   },
-  "overall_risk_score": 98,
+  "overall_risk_score": 100,
   "scores": {
-    "anti_rat_physics_risk": 98,
-    "coercion_stress_risk": 12,
+    "anti_rat_physics_risk": 100,
+    "coercion_stress_risk": 0,
     "operator_mismatch_risk": 6
   },
   "flags": [
     {
       "code": "ZERO_RECOIL_RAT",
       "severity": "CRITICAL",
-      "title": "Synthetic interaction fixture",
-      "detail": "Constructed flat acceleration and untrusted events; not a measured remote-access test."
+      "title": "Low tap recoil",
+      "detail": "Observed peak 0.0000 m/s² in a covered tap window."
     }
   ],
   "recoil_waveform": [

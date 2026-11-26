@@ -1,6 +1,6 @@
 # Shared data contracts
 
-**Contract C version 1.4.0 and Contract D version 1.3.0. Contracts A and B retain their existing schemas.** Source: PRD section 3 (pages 2-4), with Person Two behavior on pages 6-7. Field names and nesting are preserved. Schemas preserve the PRD example shapes and document the runtime extensions below.
+**Contract C version 1.5.0 and Contract D version 1.3.0. Contracts A and B retain their existing schemas.** Source: PRD section 3 (pages 2-4), with Person Two behavior on pages 6-7. Field names and nesting are preserved. Schemas preserve the PRD example shapes and document the runtime extensions below.
 
 Do not silently alter fields. Update schemas, this document, affected fixtures, and consumers together. Sample values are examples, not fixed constants unless explicitly stated (128 dimensions, event type, and decision modes).
 
@@ -96,7 +96,7 @@ Contract A keeps the original complete measurement records. Omit incomplete obse
 
 `contracts/fixtures/manifest.json` lists seven synthetic scenarios. Normal, synthetic touch, dictation, handoff, ring, and banned operator include A-D. Missing sensors includes A, C and D and illustrates step-up with unavailable motion and identity evidence. Its waveform is empty.
 
-Synthetic IMU/key timings are constructed examples. Fixture embeddings, scores and map points are hand-authored illustrations. Evaluate algorithm performance separately.
+Synthetic IMU/key timings are constructed examples. Fixture embeddings, identity scores and map points are hand-authored illustrations. Fixture dashboard scores and explanations apply the backend rules to those synthetic inputs. Evaluate algorithm performance separately.
 
 Run `python scripts/validate_contracts.py` and `python -m unittest discover -s tests -v` from the repo root in the configured environment.
 
@@ -116,6 +116,10 @@ The ML population endpoints and dashboard initialization add an optional `positi
 
 Contract C 1.2 adds optional `decision_explanation` to the completed event. New decisions record the policy version and an ordered list of the rules that determined the outcome. Each rule has a stable code, short title and plain-English detail. Multiple qualifying holds are retained. A missing-evidence step-up is recorded only when no hold rule applies. Flags continue to describe observations independently. Mock identity remains labeled by the event’s `MOCK_IDENTITY` flag. The saved event supplies the WebSocket, dashboard recovery and dossier export. Existing events can omit the field. Upgrade strict Contract C validators before enabling a 1.2 producer. In version 1.2 this extension affected only the analyst event.
 
+Contract C 1.5 adds optional `decision_explanation.evidence` and optional `evidence_ids` on each decision reason. Evidence groups have stable IDs, an observed or unavailable status, and display-ready summaries and facts derived at scoring time. Reasons point to their supporting evidence. The UI keeps other observations separate. Existing cases retain their saved explanations. Upgrade strict 1.4 receivers before enabling the new fields. The change adds no raw input and does not extend the mobile response.
+
+Tap figures cover the recorded pointer windows that satisfy the motion criteria. The selected peak and provenance refer to the highest-risk covered tap. Earlier covered taps may remain in the evidence even when the final interaction has insufficient coverage. Cadence shows the exact first qualifying run of three bursts and the two intervening key-down gaps. Operator cosine similarity and linked-account counts come from the identity response. Owner similarity is a separate comparison against the enrolled owner baseline. Neither similarity is a probability or a per-feature attribution.
+
 ### Silent Duress
 
 Contracts C and D version 1.3 extend the original PRD with a fourth outcome, `STEALTH_HOLD`. A coercion score at or above the configured hold threshold and a new recipient activate it. If another hold rule also qualifies, the decision is stealth and the recorded explanation retains all qualifying reasons. Other hold rules still select `MIRAGE_HOLD`. The default policy version is `demo-2`. Strict enum consumers, including the mobile SDK, must upgrade with the backend. Historical decisions and receipts keep their original meanings.
@@ -131,3 +135,11 @@ The analyst snapshot includes `rings` for the active identity mode. Each entry r
 `POST /api/v1/rings/{evidence_session_id}/freeze` requires analyst authentication and the JSON body `{"confirmed":true}`. The server resolves the accounts from persisted evidence, rejects stale confirmation evidence, and activates the account restrictions after the identity service confirms the operator ban. It atomically records the reviews and freezes the ring's held transfers for the confirmed accounts. New transfers from accounts in review are held and frozen in the simulation. Account restrictions and attribution are scoped to the active identity mode.
 
 `exposure_kzt` sums uniquely attributed held transfers across the ring. `protected_kzt` is the portion frozen for accounts in review. When active rings share an account, new transfers are attributed to the first active review for that account. Both counters use simulated transfer amounts. Contract C 1.4 permits a sixth decision reason for `RING_ACCOUNT_REVIEW` under the default `demo-3` policy. Older events remain valid. Contract D reuses the existing hold outcomes.
+
+## Live Telemetry X-Ray
+
+The display stream uses its own WebSocket messages. An opted-in mobile SDK sends `XRAY_FRAME` on the existing `/ws/mobile/{session}` connection. An authenticated analyst listens on `/ws/xray/{session}` for one connected phone session. Both sockets require an allowed origin and a valid role session for relaying this data. The backend sends `XRAY_ENDED` when that phone disconnects. Each analyst view keeps a bounded, in-memory window and clears it on close or session switch. Frames are neither saved nor used by the decision policy. Contracts A–D retain their existing schemas.
+
+The frame has three arrays. `taps` contains at most 12 objects with `at` (elapsed milliseconds), `trusted` (browser pointer provenance), and `trace` (at most 24 `[offset_ms, delta_z_m_per_s2]` pairs). An empty trace means the tap lacks sufficient coverage. The display applies the same baseline, impact and gap requirements as the scored recoil calculation. `swipes` contains up to 48 `[elapsed_ms, x_norm, y_norm, stroke]` tuples from the confirmation slider. The view computes speed from adjacent observations in the same stroke with intervals from 1–150 ms. `keys` contains up to 24 `[down_ms, up_ms]` pairs and carries timing only.
+
+The phone defaults to sharing off and batches opted-in observations every 150 ms. The relay accepts bounded JSON frames with known fields and applies a per-phone rate limit. Under load, the display can drop frames. Completed transfer decisions still arrive on the existing dashboard feed. Browser provenance and low recoil cannot establish whether a device was controlled remotely. Synthetic fixture playback runs locally in the analyst view and is labeled throughout.

@@ -7,6 +7,7 @@ import type {
   Tap,
   TransferContext,
 } from "./types";
+import { XRayPublisher } from "./xray";
 
 type Contact = NonNullable<SessionTelemetry["contacts"]>[number];
 const clamp = (value: number, min = 0, max = 1) =>
@@ -49,6 +50,7 @@ function osLabel() {
 export interface KinetiqConfig {
   accountId: string;
   collectMotion: boolean;
+  shareLiveSignals?: boolean;
 }
 export class KinetiqSDK {
   readonly sessionId =
@@ -78,12 +80,17 @@ export class KinetiqSDK {
   private reconnect?: ReturnType<typeof setTimeout>;
   private delay?: ReturnType<typeof setTimeout>;
   private running = false;
+  private readonly xray?: XRayPublisher;
+  private xrayTimer?: ReturnType<typeof setInterval>;
+  private firstSwipePoint = false;
 
   readonly accountId: string;
   private readonly collectMotion: boolean;
   constructor(config: KinetiqConfig | string) {
     this.accountId = typeof config === "string" ? config : config.accountId;
     this.collectMotion = typeof config === "string" || config.collectMotion;
+    if (typeof config !== "string" && config.shareLiveSignals)
+      this.xray = new XRayPublisher();
   }
   private pruneMotion(cutoff: number) {
     while (this.motionCount) {
@@ -151,18 +158,21 @@ export class KinetiqSDK {
           e.height >= 0 &&
           this.taps.length < 512
         ) {
-          this.taps.push({
+          const tap = {
             ...point,
             radius_x: e.width / 2,
             radius_y: e.height / 2,
             is_trusted: e.isTrusted,
-          });
+          };
+          this.taps.push(tap);
+          if (!document.hidden) this.xray?.tap(tap);
         }
         if (
           field.dataset.kinetiqField === "slider" &&
           this.slider === undefined
         ) {
           this.slider = e.pointerId;
+          this.firstSwipePoint = true;
           this.trace(e);
         }
         const group = field.dataset.keyGroup;
@@ -201,8 +211,11 @@ export class KinetiqSDK {
             is_trusted: contact.is_trusted && e.isTrusted,
             up_ms: released,
           });
-        if (key && released >= key.down_ms && this.keys.length < 512)
-          this.keys.push({ ...key, up_ms: released });
+        if (key && released >= key.down_ms && this.keys.length < 512) {
+          const sample = { ...key, up_ms: released };
+          this.keys.push(sample);
+          if (!document.hidden) this.xray?.key(sample);
+        }
         this.release(e.pointerId);
       },
       options,
@@ -218,10 +231,15 @@ export class KinetiqSDK {
         this.held.clear();
         this.touches.clear();
         this.slider = undefined;
+        this.xray?.reset();
       },
       options,
     );
-    if (onDemoClick) this.connect(onDemoClick);
+    if (onDemoClick || this.xray) this.connect(onDemoClick);
+    if (this.xray)
+      this.xrayTimer = setInterval(() => {
+        if (!document.hidden) this.xray?.flush(this.socket, this.time());
+      }, 150);
   }
 
   private listenForMotion(options: AddEventListenerOptions) {
@@ -240,6 +258,7 @@ export class KinetiqSDK {
             this.orientation = undefined;
             this.motion.length = 0;
             this.motionHead = this.motionCount = 0;
+            this.xray?.clearMotion();
           };
           check();
           status.addEventListener("change", check, {
@@ -299,6 +318,7 @@ export class KinetiqSDK {
           return;
         lastMotionTime = t;
         const sample = { ...angle, t_ms: t, ax: a.x, ay: a.y, az: a.z };
+        this.xray?.motion({ t_ms: t, az: a.z });
         this.pruneMotion(t - 20000);
         this.motion[this.motionHead] = sample;
         this.motionCount = Math.min(4096, this.motionCount + 1);
@@ -325,10 +345,13 @@ export class KinetiqSDK {
       finite(e.pressure) &&
       this.sliders.length < 2048
     ) {
-      this.sliders.push({ ...this.position(e), pressure: clamp(e.pressure) });
+      const point = { ...this.position(e), pressure: clamp(e.pressure) };
+      this.sliders.push(point);
+      if (!document.hidden) this.xray?.swipe(point, this.firstSwipePoint);
+      this.firstSwipePoint = false;
     }
   }
-  private connect(onCommand: () => void, attempts = 0) {
+  private connect(onCommand?: () => void, attempts = 0) {
     if (this.events.signal.aborted) return;
     const url = new URL("/ws/mobile/" + this.sessionId, location.href);
     url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -343,12 +366,13 @@ export class KinetiqSDK {
           !this.events.signal.aborted &&
           JSON.parse(event.data).cmd === "INJECT_RAT_CLICK"
         )
-          onCommand();
+          onCommand?.();
       } catch {
         /* Ignore unrecognized command frames. */
       }
     };
     socket.onclose = () => {
+      this.xray?.reset();
       if (!this.events.signal.aborted && attempts < 8)
         this.reconnect = setTimeout(
           () => this.connect(onCommand, attempts + 1),
@@ -414,6 +438,7 @@ export class KinetiqSDK {
         }, 50);
       });
       this.frozen = this.snapshot(context);
+      if (!document.hidden) this.xray?.flush(this.socket, this.time(), true);
       this.detach();
     }
     const response = await fetch("/api/v1/sessions/ingest", {
@@ -461,6 +486,8 @@ export class KinetiqSDK {
   private detach() {
     this.events.abort();
     clearTimeout(this.reconnect);
+    clearInterval(this.xrayTimer);
+    this.xray?.reset();
     if (this.socket) {
       this.socket.onmessage = this.socket.onclose = null;
       this.socket.close();

@@ -59,7 +59,17 @@ async def exercise(directory, identity_url, token):
         reentry = next(e for e in events if e["session_id"] == "check_reentry")
         assert any(f["code"] == "BANNED_OPERATOR" for f in reentry["flags"])
         assert reentry["decision"] == "MIRAGE_HOLD"
-        print("Verified live scoring, three enrollments, owner success, ring freeze, protected KZT, and banned-operator re-entry.")
+        explanation = reentry["decision_explanation"]
+        assert next(rule for rule in explanation["reasons"] if rule["code"] == "BANNED_OPERATOR")["evidence_ids"] == ["operator"]
+        operator = next(group for group in explanation["evidence"] if group["id"] == "operator")
+        facts = {fact["label"]: fact["value"] for fact in operator["facts"]}
+        assert float(facts["Cosine similarity"]) >= 0.8
+        assert int(facts["Other linked accounts"]) >= 2
+        exported = await bank.get("/api/v1/cases/check_reentry/export-antifraud",
+                                  headers={"Authorization": f"Bearer {analyst}"})
+        exported.raise_for_status()
+        assert exported.json()["event"]["decision_explanation"] == explanation
+        print("Verified live scoring, enrollment, ring freeze, banned-operator evidence, and dossier export.")
 
 
 async def main(interpreter, model):

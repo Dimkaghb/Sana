@@ -152,7 +152,9 @@ Verified all three steps locally. All seven scenario decisions passed the HTTP a
 
 On this laptop, the seven mock-identity requests took 3.3–16.5 ms each. The synthetic evaluation used 18 enrolled and 18 query sessions. Feature extraction plus encoder inference took about 1 ms at p95. Both eligible cross-account queries ranked the expected operator first. Participant accuracy and end-to-end latency on physical phones remain open.
 
-For a repeatable demonstration, open the fixture dashboard, select the transfer labeled “Possible coaching on a transfer to a new recipient,” and open its dossier. The synthetic decision cites repeated digit bursts, a new recipient and a score of 82 against the hold threshold of 75.
+For a repeatable demonstration, open the fixture dashboard, select the transfer labeled “Possible coaching on a transfer to a new recipient,” and open its dossier. Both views display three groups of three key presses, two 1,100 ms pauses, a new recipient and a score of 80 against the hold threshold of 75.
+
+Decision evidence now links policy reasons to measured touch coverage, recorded browser provenance, keypad timing, movement, identity results and transfer context. The same versioned record appears in the queue, case dossier and export. The browser tests verify the synthetic pause lengths, operator cosine and recoil figures. Backend tests compare the live dashboard event with the exported evidence and verify that insufficient coverage leaves the peak unavailable. The live identity rehearsal checks the banned operator profile and linked-account count against the exported case.
 
 ## Silent Duress
 
@@ -167,3 +169,11 @@ The production build, four schemas, 27 fixtures, seven HTTP/WebSocket scenarios,
 The analyst queue and population map connect suspected mule rings to persisted cross-account cosine matches. The detail card shows the linked accounts and the simulated KZT exposure and protected value. After confirmation, the backend bans the operator, freezes existing held transfers attributed to the confirmed ring and places subsequent transfers from the linked accounts in review.
 
 Verified the workflow against the isolated live identity service. The check established the owner baseline, identified the cross-account match, froze the linked accounts, held a subsequent transfer and counted the frozen KZT. The browser test verified that cancel leaves the ring unchanged and confirmation refreshes the counter. Backend tests cover persistence after restart, retry accounting, permission and evidence checks, and identity-service failure.
+
+## Live Telemetry X-Ray
+
+1. Derive tap windows, confirmation-slider movement and keypad timing from the existing SDK listeners. Publish short batches for a single opted-in transfer.
+2. Validate and relay bounded frames to an authenticated analyst who chooses that phone. Build the collapsible charts and a clearly labeled replay from the normal and synthetic-touch fixtures.
+3. Test publication before the transfer submits, subscription scope, absent telemetry, teardown on completion, and gesture and cadence rendering. Rehearse handheld and tabletop conditions separately on physical phones.
+
+The production build, 21 shared tests, 24 backend tests, and 17 browser tests passed. A separate rehearsal used authenticated phone and analyst browser sessions and Chromium's virtual motion sensors. The analyst received all three signal types before submission and saw the stream end when the phone closed. The stored transfer count stayed unchanged. Handheld and tabletop pickup still need verification on physical phones.

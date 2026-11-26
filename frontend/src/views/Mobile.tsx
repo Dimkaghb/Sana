@@ -119,6 +119,7 @@ function Transfer({
   fixture?: Decision;
 }) {
   const [permission, setPermission] = useState<SensorAccess>();
+  const [shareLiveSignals, setShareLiveSignals] = useState(false);
   const [prompting, setPrompting] = useState(false);
   const [amount, setAmount] = useState("50000");
   const [recipient, setRecipient] = useState("");
@@ -155,6 +156,7 @@ function Transfer({
       void submit();
     },
     permission === "allowed",
+    shareLiveSignals,
   );
   const canSubmit =
     (!!fixture || !!sdk) &&
@@ -221,6 +223,18 @@ function Transfer({
           Датчики движения и ритм касаний помогают проверить перевод. Вводите
           только вымышленные реквизиты.
         </p>
+        {!fixture && (
+          <Label className="xray-opt-in">
+            <Checkbox
+              checked={shareLiveSignals}
+              disabled={prompting}
+              onCheckedChange={(checked) =>
+                setShareLiveSignals(checked === true)
+              }
+            />
+            Показать аналитику сигналы этого перевода в реальном времени
+          </Label>
+        )}
         <Button
           className="primary"
           disabled={prompting}

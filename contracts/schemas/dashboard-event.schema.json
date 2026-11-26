@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:sana-shield:contract:C:1.4.0",
+  "$id": "urn:sana-shield:contract:C:1.5.0",
   "title": "DashboardRealtimeEvent",
   "type": "object",
   "description": "Contract C: backend -> dashboard. A completed session snapshot, not continuous telemetry.",
@@ -43,6 +43,34 @@
       "required": ["policy_version", "reasons"],
       "properties": {
         "policy_version": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "maxItems": 7,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "title", "summary", "status", "facts"],
+            "properties": {
+              "id": { "$ref": "#/$defs/evidence_id" },
+              "title": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "summary": { "type": "string", "minLength": 1, "maxLength": 512 },
+              "status": { "enum": ["observed", "unavailable"] },
+              "facts": {
+                "type": "array",
+                "maxItems": 12,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["label", "value"],
+                  "properties": {
+                    "label": { "type": "string", "minLength": 1, "maxLength": 128 },
+                    "value": { "type": "string", "minLength": 1, "maxLength": 256 }
+                  }
+                }
+              }
+            }
+          }
+        },
         "reasons": {
           "type": "array",
           "minItems": 1,
@@ -54,7 +82,13 @@
             "properties": {
               "code": { "type": "string", "minLength": 1 },
               "title": { "type": "string", "minLength": 1 },
-              "detail": { "type": "string", "minLength": 1 }
+              "detail": { "type": "string", "minLength": 1 },
+              "evidence_ids": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/evidence_id" },
+                "uniqueItems": true,
+                "maxItems": 7
+              }
             }
           }
         }
@@ -201,5 +235,8 @@
     "recoil_waveform",
     "map_point"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "evidence_id": { "enum": ["touch", "cadence", "motion", "operator", "owner", "transfer", "review"] }
+  }
 }

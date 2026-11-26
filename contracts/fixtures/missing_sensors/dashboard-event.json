@@ -6,32 +6,127 @@
   "account_label": "Demo account 101",
   "decision": "STEP_UP_LIVENESS",
   "decision_explanation": {
-    "policy_version": "demo-2",
+    "policy_version": "demo-3",
     "reasons": [
       {
         "code": "OWNER_EVIDENCE_MISSING",
         "title": "Owner comparison unavailable",
-        "detail": "The session had no usable comparison with a sufficiently enrolled owner."
+        "detail": "The session had no usable comparison with a sufficiently enrolled owner.",
+        "evidence_ids": [
+          "owner"
+        ]
       },
       {
         "code": "RECOIL_EVIDENCE_MISSING",
         "title": "Tap motion unavailable",
-        "detail": "There was insufficient motion coverage to score the final interaction."
+        "detail": "There was insufficient motion coverage to score the final interaction.",
+        "evidence_ids": [
+          "touch"
+        ]
+      }
+    ],
+    "evidence": [
+      {
+        "id": "touch",
+        "title": "Tap recoil and browser input",
+        "summary": "The session contained no usable motion readings.",
+        "status": "unavailable",
+        "facts": [
+          {
+            "label": "Covered taps",
+            "value": "0 of 7"
+          },
+          {
+            "label": "Low recoil taps",
+            "value": "0"
+          },
+          {
+            "label": "Low recoil cutoff",
+            "value": "0.08 m/s²"
+          },
+          {
+            "label": "Slider speed variation",
+            "value": "47.7% (uniform below 2.5%)"
+          },
+          {
+            "label": "Final tap coverage",
+            "value": "Insufficient"
+          }
+        ]
+      },
+      {
+        "id": "cadence",
+        "title": "Keypad timing",
+        "summary": "No sequence of three qualifying digit bursts was recorded.",
+        "status": "observed",
+        "facts": [
+          {
+            "label": "Complete key presses",
+            "value": "6"
+          },
+          {
+            "label": "Pattern rule",
+            "value": "2–4 digits per burst, <300 ms within a burst, >900 ms between bursts"
+          }
+        ]
+      },
+      {
+        "id": "motion",
+        "title": "Device movement",
+        "summary": "The motion stream lacked a sufficiently long, continuous recording for this check.",
+        "status": "unavailable",
+        "facts": []
+      },
+      {
+        "id": "operator",
+        "title": "Behavioral operator match",
+        "summary": "The identity service did not return a usable result.",
+        "status": "unavailable",
+        "facts": []
+      },
+      {
+        "id": "owner",
+        "title": "Account owner comparison",
+        "summary": "The identity service did not return a usable result.",
+        "status": "unavailable",
+        "facts": []
+      },
+      {
+        "id": "transfer",
+        "title": "Transfer context",
+        "summary": "The hold policy considers recipient history and amount for specific rules.",
+        "status": "observed",
+        "facts": [
+          {
+            "label": "Recipient",
+            "value": "New"
+          },
+          {
+            "label": "Amount",
+            "value": "₸ 450,000.00"
+          }
+        ]
       }
     ]
   },
-  "overall_risk_score": null,
+  "overall_risk_score": 0,
   "scores": {
     "anti_rat_physics_risk": null,
-    "coercion_stress_risk": null,
+    "coercion_stress_risk": 0,
     "operator_mismatch_risk": null
   },
   "flags": [
     {
-      "code": "INSUFFICIENT_EVIDENCE",
+      "code": "RECOIL_UNAVAILABLE",
       "severity": "INFO",
-      "title": "Additional verification required",
-      "detail": "Motion and identity scores are unavailable in this example."
+      "title": "Tap recoil unavailable",
+      "detail": "The final interaction lacked sufficient overlapping motion samples."
+    },
+    {
+      "code": "IDENTITY_UNAVAILABLE",
+      "severity": "INFO",
+      "title": "Owner evidence unavailable",
+      "detail": "No valid score against a sufficiently enrolled owner."
     }
   ],
   "recoil_waveform": [],

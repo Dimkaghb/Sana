@@ -143,10 +143,28 @@ class RuntimeTests(unittest.TestCase):
                 self.assertNotIn("decision_explanation", response)
                 exported = c.get(f"/api/v1/cases/{event['session_id']}/export-antifraud", headers=ADMIN).json()
                 self.assertEqual(exported["event"]["decision_explanation"], basis)
+                evidence = {group["id"]: group for group in basis["evidence"]}
+
+                def facts(group):
+                    return {entry["label"]: entry["value"] for entry in evidence[group]["facts"]}
+
                 if scenario == "dictation":
                     self.assertIn("bursts", basis["reasons"][0]["detail"])
+                    self.assertIn("cadence", basis["reasons"][0]["evidence_ids"])
+                    self.assertEqual(facts("cadence")["Pauses between bursts"], "1100 ms and 1100 ms")
+                    self.assertEqual(facts("cadence")["Digits per burst"], "3 / 3 / 3")
+                if scenario == "synthetic_touch":
+                    self.assertEqual(facts("touch")["Covered taps"], "7 of 7")
+                    self.assertEqual(facts("touch")["Selected Z peak"], "0 m/s²")
+                    self.assertEqual(facts("touch")["Low recoil cutoff"], "0.08 m/s²")
+                if scenario in {"banned_operator", "ring"}:
+                    self.assertEqual(facts("operator")["Cosine similarity"], "0.9300")
+                    other_accounts = "0" if scenario == "banned_operator" else "2"
+                    self.assertEqual(facts("operator")["Other linked accounts"], other_accounts)
                 if scenario == "missing_sensors":
                     self.assertIsNone(event["scores"]["anti_rat_physics_risk"])
+                    self.assertEqual(evidence["touch"]["status"], "unavailable")
+                    self.assertNotIn("Selected Z peak", facts("touch"))
                 if scenario == "normal":
                     original = response
         with self.client() as c:

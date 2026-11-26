@@ -103,6 +103,12 @@ def validate_payload(letter, payload, checks=None):
         reconciliation = payload["operator_reconciliation"]
         if reconciliation["ring_size"] != len(reconciliation["linked_account_ids"]):
             errors.append("ring_size must equal the number of distinct linked_account_ids")
+    if letter == "C" and (explanation := payload.get("decision_explanation")):
+        ids = [record["id"] for record in explanation.get("evidence", [])]
+        if len(ids) != len(set(ids)):
+            errors.append("decision_explanation.evidence: IDs must be unique")
+        if any(set(rule.get("evidence_ids", [])) - set(ids) for rule in explanation["reasons"]):
+            errors.append("decision_explanation.reasons: unknown evidence reference")
     return errors
 
 

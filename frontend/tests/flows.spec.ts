@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import type { SessionTelemetry } from "../src/sdk";
+import type { SessionTelemetry, XRayFrame } from "../src/sdk";
 import type { DashboardEvent } from "../src/types";
 
 const fixture = (name: string) =>
@@ -340,7 +340,7 @@ test("clean live session enrollment requires independent verification and analys
   await page
     .getByRole("button", { name: "Inspect " + event.session_id, exact: true })
     .click();
-  await expect(page.getByText("Operator match · 89%")).toBeVisible();
+  await expect(page.getByText("Operator match · 0.8900 cosine similarity")).toBeVisible();
   const enroll = page.getByRole("button", { name: "Enroll verified session" });
   await expect(enroll).toBeDisabled();
   await page
@@ -586,6 +586,178 @@ test("Guardian device alerts require opt-in and can be disabled", async ({
     page.getByRole("button", { name: "Enable device alerts" }),
   ).toBeVisible();
   expect(enabled).toBe(false);
+});
+
+test("opted-in phone sends timing and swipe observations before submission", async ({
+  page,
+}) => {
+  const frames: XRayFrame[] = [];
+  let submitted = false;
+  await page.routeWebSocket("**/ws/mobile/*", (socket) =>
+    socket.onMessage((msg) => {
+      frames.push(JSON.parse(String(msg)));
+    }),
+  );
+  await page.route("**/api/v1/sessions/ingest", (route) => {
+    submitted = true;
+    return route.fulfill({
+      json: { ...d, session_id: route.request().postDataJSON().session_id },
+    });
+  });
+  await page.goto("/mobile");
+  const sharing = page.getByRole("checkbox", {
+    name: /Показать аналитику сигналы/,
+  });
+  await expect(sharing).not.toBeChecked();
+  await sharing.check();
+  await page
+    .getByRole("button", { name: "Включить защиту SANA Shield" })
+    .click();
+  for (const digit of ["7", "4", "6", "3"])
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  await expect.poll(() => frames.flatMap((frame) => frame.keys).length).toBe(4);
+  const track = page.getByRole("button", { name: "Подтвердить перевод" });
+  await track.scrollIntoViewIfNeeded();
+  const box = (await track.boundingBox())!;
+  await page.mouse.move(box.x + 12, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, {
+    steps: 8,
+  });
+  await expect
+    .poll(() => frames.flatMap((frame) => frame.swipes).length)
+    .toBeGreaterThan(2);
+  expect(submitted).toBe(false);
+  expect(
+    frames.every(
+      (frame) =>
+        Object.keys(frame).sort().join(",") === "keys,swipes,taps,type",
+    ),
+  ).toBe(true);
+  expect(
+    frames.flatMap((frame) => frame.taps).some((tap) => tap.trace.length === 0),
+  ).toBe(true);
+  await page.mouse.up();
+  await track.press("Enter");
+  await expect(page.getByText(d.reference_code)).toBeVisible();
+});
+
+test("analyst X-Ray renders live frames, ends cleanly, and labels fixture replay", async ({
+  page,
+}) => {
+  await page.routeWebSocket("**/ws/dashboard", () => {});
+  await page.route("**/api/v1/dashboard/init*", (route) =>
+    route.fulfill({
+      json: {
+        events: [],
+        ml_mode: "mock",
+        active_sessions: ["selected-phone"],
+        population_map: null,
+        kpis: {
+          sessions: 0,
+          held_amount_kzt: 0,
+          ring_count: 0,
+          average_inference_ms: null,
+        },
+      },
+    }),
+  );
+  let ended: () => void = () => {};
+  await page.routeWebSocket("**/ws/xray/selected-phone", (socket) => {
+    socket.send(
+      JSON.stringify({
+        type: "XRAY_FRAME",
+        taps: [
+          {
+            at: 200,
+            trusted: true,
+            trace: [
+              [-30, 0],
+              [0, 0.38],
+              [20, 0.02],
+            ],
+          },
+        ],
+        swipes: [
+          [210, 0.1, 0.7, 1],
+          [241, 0.3, 0.6, 1],
+        ],
+        keys: [
+          [20, 55],
+          [110, 155],
+        ],
+      }),
+    );
+    ended = () => socket.send(JSON.stringify({ type: "XRAY_ENDED" }));
+  });
+  await page.goto("/dashboard");
+  const panel = page.getByRole("region", { name: "Telemetry X-Ray" });
+  await panel.getByRole("button", { name: "Show live signals" }).click();
+  await expect(panel.getByText("Receiving live phone signals")).toBeVisible();
+  await expect(panel.getByText(/0.380 m\/s² peak/)).toBeVisible();
+  await expect(
+    panel.getByRole("img", { name: "Swipe speed over time" }),
+  ).toBeVisible();
+  await expect(
+    panel.getByText(/45 ms dwell · 55 ms preceding gap/),
+  ).toBeVisible();
+  ended();
+  await expect(panel.getByText(/Phone stream ended/)).toBeVisible();
+  await expect(panel.getByText(/0.380 m\/s² peak/)).toBeVisible();
+  await panel
+    .getByRole("button", { name: "Replay synthetic-touch fixture" })
+    .click();
+  await expect(panel.getByText("Playing synthetic fixture")).toBeVisible();
+  await expect(panel.getByText(/Synthetic pointer event/)).toBeVisible({
+    timeout: 8000,
+  });
+  await panel.getByRole("button", { name: "Hide live signals" }).click();
+  await expect(panel.getByRole("heading", { name: "Tap recoil" })).toHaveCount(
+    0,
+  );
+});
+
+test("queue and dossier cite measured tap coverage, actual pauses, and operator similarity", async ({
+  page,
+}) => {
+  await page.goto("/dashboard?mode=fixtures");
+  async function select(reason: string) {
+    await page.getByRole("button", { name: new RegExp(reason) }).click();
+    return page.getByRole("region", { name: "Decision explanation" });
+  }
+  let explanation = await select(
+    "Possible coaching on a transfer to a new recipient",
+  );
+  await expect(
+    explanation.getByRole("heading", { name: "Why SANA flagged this" }),
+  ).toBeVisible();
+  await expect(
+    explanation.getByText("1100 ms and 1100 ms", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    explanation.getByText("3 / 3 / 3", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Open dossier" }).click();
+  const dossier = page.getByRole("dialog");
+  await expect(
+    dossier.getByText("1100 ms and 1100 ms", { exact: true }),
+  ).toBeVisible();
+  await dossier.getByText("Other measurements and coverage").click();
+  await expect(
+    dossier.getByText("Enrolled sessions", { exact: true }),
+  ).toBeVisible();
+  await dossier.getByRole("button", { name: "Close", exact: true }).click();
+  explanation = await select("Tap evidence triggered a hold");
+  await expect(explanation.getByText("7 of 7", { exact: true })).toBeVisible();
+  await expect(
+    explanation.getByText("0.08 m/s²", { exact: true }),
+  ).toBeVisible();
+  await expect(explanation.getByText(/otherwise untrusted/)).toBeVisible();
+  explanation = await select("Similar behavior across accounts");
+  await expect(explanation.getByText("0.9300", { exact: true })).toBeVisible();
+  await expect(
+    explanation.getByText("Other linked accounts", { exact: true }),
+  ).toBeVisible();
 });
 
 test("ring freeze requires confirmation and refreshes protected KZT", async ({

@@ -15,6 +15,46 @@ from scripts.validate_contracts import FIXTURES, load_json
 
 
 class WorkspaceTests(unittest.TestCase):
+    def test_xray_relays_only_bounded_frames_for_authenticated_selected_phone(self):
+        frame = {"type": "XRAY_FRAME", "taps": [{"at": 100, "trusted": True, "trace": []}],
+                 "swipes": [[101, 0.2, 0.3, 1]], "keys": [[50, 100]]}
+        origin = {"Origin": "http://localhost:5173"}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "xray.sqlite")
+            with sqlite3.connect(path) as db:
+                accounts.initialize(db)
+                accounts.provision(db, "phone", "test-password-12", "mobile")
+                accounts.provision(db, "ops", "test-password-12", "analyst")
+            with TestClient(create_app(Settings("mock", path))) as client:
+                def sign_in(role, alias):
+                    client.post(f"/api/v1/auth/{role}/login", headers=origin,
+                                json={"alias": alias, "password": "test-password-12"}).raise_for_status()
+
+                sign_in("mobile", "phone")
+                with client.websocket_connect("/ws/mobile/demo-a", headers=origin) as phone:
+                    with self.assertRaises(WebSocketDisconnect):
+                        with client.websocket_connect("/ws/xray/demo-a", headers=origin):
+                            pass
+                    sign_in("analyst", "ops")
+                    with self.assertRaises(WebSocketDisconnect):
+                        with client.websocket_connect("/ws/xray/demo-a", headers={"Origin": "https://other.example"}):
+                            pass
+                    with (
+                        client.websocket_connect("/ws/xray/demo-a", headers=origin) as analyst,
+                        client.websocket_connect("/ws/mobile/demo-b", headers=origin) as second_phone,
+                        client.websocket_connect("/ws/xray/demo-b", headers=origin) as second_analyst,
+                    ):
+                        phone.send_json({**frame, "recipient": "private-value"})
+                        phone.send_json({**frame, "swipes": [[101, 9, 0.3, 1]]})
+                        phone.send_json(frame)
+                        self.assertEqual(analyst.receive_json(), frame)
+                        second = {**frame, "keys": [[500, 550]]}
+                        second_phone.send_json(second)
+                        self.assertEqual(second_analyst.receive_json(), second)
+                        phone.close()
+                        self.assertEqual(analyst.receive_json(), {"type": "XRAY_ENDED"})
+                        self.assertEqual(client.get("/api/v1/dashboard/init").json()["kpis"]["sessions"], 0)
+
     def test_authenticated_account_to_analyst(self):
         with tempfile.TemporaryDirectory() as tmp:
             dbfile = str(Path(tmp) / "sandbox.sqlite")

@@ -6,6 +6,7 @@ export function useKinetiq(
   enabled: boolean,
   onCommand: () => void,
   collectMotion = true,
+  shareLiveSignals = false,
 ) {
   const handler = useRef(onCommand);
   const [sdk, setSdk] = useState<KinetiqSDK>();
@@ -17,10 +18,14 @@ export function useKinetiq(
       setSdk(undefined);
       return;
     }
-    const instance = new KinetiqSDK({ accountId: account, collectMotion });
+    const instance = new KinetiqSDK({
+      accountId: account,
+      collectMotion,
+      shareLiveSignals,
+    });
     instance.start(() => handler.current());
     setSdk(instance);
     return () => instance.stop();
-  }, [account, enabled, collectMotion]);
+  }, [account, enabled, collectMotion, shareLiveSignals]);
   return sdk;
 }
