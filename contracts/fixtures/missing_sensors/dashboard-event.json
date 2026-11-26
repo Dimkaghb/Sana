@@ -5,6 +5,21 @@
   "account_id": "acc_student_101",
   "account_label": "Demo account 101",
   "decision": "STEP_UP_LIVENESS",
+  "decision_explanation": {
+    "policy_version": "demo-1",
+    "reasons": [
+      {
+        "code": "OWNER_EVIDENCE_MISSING",
+        "title": "Owner comparison unavailable",
+        "detail": "The session had no usable comparison with a sufficiently enrolled owner."
+      },
+      {
+        "code": "RECOIL_EVIDENCE_MISSING",
+        "title": "Tap motion unavailable",
+        "detail": "There was insufficient motion coverage to score the final interaction."
+      }
+    ]
+  },
   "overall_risk_score": null,
   "scores": {
     "anti_rat_physics_risk": null,

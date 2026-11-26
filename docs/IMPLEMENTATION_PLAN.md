@@ -137,3 +137,17 @@ The latest run passed 21 shared contract/window tests, 17 backend tests, seven M
 Verified the dashboard volume against the existing local rehearsal with 150 seeded sessions and one live submission. All 151 points received three PCA coordinates derived from their stored embeddings. The production build, 21 shared tests, 17 backend tests, seven ML tests and ten browser tests passed. The browser check exercised the live view at desktop and phone widths.
 
 The analyst now explores the three-dimensional projection from a first-person camera. The live rehearsal showed 18 numbered groups for 143 grouped sessions and listed eight ungrouped sessions separately. Selecting a group reveals its member sessions. At 1500 px and 390 px browser widths, all 18 overview markers were visible and individually selectable by center-point hit testing. The production build and all ten browser tests passed.
+
+## Analyst decision explanations
+
+Selected the decision explainer for the judging demo. The existing Mirage Hold already gives the phone a calm processing receipt and sends the held transfer to the scoped Guardian. A coordinated account freeze would require a persistent account restriction and an undo workflow. A live sensor strip would require a new pre-submission stream and validation on physical phones.
+
+1. Capture the decisive rule or rules in risk fusion using the active policy and available evidence.
+2. Persist the explanation with the analyst event and render it in the transfer queue, case detail and export. Keep historical cases readable and the mobile receipt calm.
+3. Exercise coexisting hold rules, missing sensors, mock identity, replay, recovery and browser navigation.
+
+Verified all three steps locally. All seven scenario decisions passed the HTTP and WebSocket rehearsal, including retry and restart. The isolated live-model rehearsal passed enrollment, owner approval, cross-account hold, ban and re-entry. The production build and 56 tests passed across the shared, backend, ML and browser suites.
+
+On this laptop, the seven mock-identity requests took 3.3–16.5 ms each. The synthetic evaluation used 18 enrolled and 18 query sessions. Feature extraction plus encoder inference took about 1 ms at p95. Both eligible cross-account queries ranked the expected operator first. Participant accuracy and end-to-end latency on physical phones remain open.
+
+For a repeatable demonstration, open the fixture dashboard, select the transfer labeled “Possible coaching on a transfer to a new recipient,” and open its dossier. The synthetic decision cites repeated digit bursts, a new recipient and a score of 82 against the hold threshold of 75.

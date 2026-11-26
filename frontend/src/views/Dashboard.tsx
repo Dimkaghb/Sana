@@ -47,6 +47,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { DecisionExplanation } from "../components/DecisionExplanation";
 import { AccountDirectory } from "../components/AccountDirectory";
 import { ActivityChart, Signals } from "../components/Signals";
 import { Theme } from "../components/Theme";
@@ -584,8 +585,10 @@ export function Dashboard({ alias }: { alias?: string }) {
                           >
                             {e.account_label}
                             <small>
-                              {e.flags.find((f) => f.severity !== "INFO")
-                                ?.title || e.session_id}
+                              {e.decision_explanation?.reasons[0]?.title ||
+                                e.flags.find((f) => f.severity !== "INFO")
+                                  ?.title ||
+                                e.session_id}
                             </small>
                           </Button>
                         </TableCell>
@@ -626,6 +629,9 @@ export function Dashboard({ alias }: { alias?: string }) {
                 <Activity size={20} />
               </header>
               <div className="signal-body">
+                {current && (
+                  <DecisionExplanation event={current} preview={preview} />
+                )}
                 <div className="score-head">
                   <span>Risk score</span>
                   <strong>
@@ -848,6 +854,12 @@ export function Dashboard({ alias }: { alias?: string }) {
                       </p>
                     )}
                   </div>
+                )}
+                {selectedEvent && (
+                  <DecisionExplanation
+                    event={selectedEvent}
+                    preview={preview}
+                  />
                 )}
                 {selectedEvent?.flags.map((f) => (
                   <div className="flag" key={f.code}>

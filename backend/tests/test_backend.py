@@ -69,6 +69,20 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(response["ui_mode"], outcome)
                 self.assertEqual(event["session_id"], response["session_id"])
                 self.assertEqual(c.get(INIT).json()["events"][0], event)
+                basis = event["decision_explanation"]
+                codes = [item["code"] for item in basis["reasons"]]
+                self.assertEqual(basis["policy_version"], "demo-1")
+                self.assertIn({
+                    "normal": "BELOW_REVIEW_THRESHOLD", "synthetic_touch": "TOUCH_HOLD",
+                    "dictation": "COERCION_NEW_RECIPIENT", "handoff": "HANDOFF_AMOUNT",
+                    "ring": "CROSS_ACCOUNT_MATCH", "banned_operator": "BANNED_OPERATOR",
+                    "missing_sensors": "RECOIL_EVIDENCE_MISSING",
+                }[scenario], codes)
+                self.assertNotIn("decision_explanation", response)
+                exported = c.get(f"/api/v1/cases/{event['session_id']}/export-antifraud", headers=ADMIN).json()
+                self.assertEqual(exported["event"]["decision_explanation"], basis)
+                if scenario == "dictation":
+                    self.assertIn("bursts", basis["reasons"][0]["detail"])
                 if scenario == "missing_sensors":
                     self.assertIsNone(event["scores"]["anti_rat_physics_risk"])
                 if scenario == "normal":
@@ -397,6 +411,22 @@ class SignalTests(unittest.TestCase):
                 pattern + [dict(pattern[-1], down_ms=t) for t in (3750, 3900)]
             )
         )
+
+    def test_explanation_records_all_decisive_rules_and_active_policy(self):
+        payload = fixture("dictation")
+        ml = fixture("ring", "ml-score")
+        ml["operator_reconciliation"]["is_banned_operator"] = True
+        policy = Policy(version="custom", hold_threshold=79, ring_confidence=0.9)
+        *_, basis = decide(payload, Evidence(None), Evidence(80), ml, policy)
+        self.assertEqual(basis["policy_version"], "custom")
+        self.assertEqual([r["code"] for r in basis["reasons"]],
+                         ["BANNED_OPERATOR", "CROSS_ACCOUNT_MATCH", "COERCION_NEW_RECIPIENT"])
+        self.assertIn("79", basis["reasons"][-1]["detail"])
+        payload["transfer_context"]["is_new_recipient"] = False
+        result = decide(payload, Evidence(None), Evidence(80), None, policy)
+        self.assertEqual(result[0], "STEP_UP_LIVENESS")
+        self.assertEqual([r["code"] for r in result[-1]["reasons"]],
+                         ["OWNER_EVIDENCE_MISSING", "RECOIL_EVIDENCE_MISSING", "STEP_UP_SCORE"])
 
     def test_explicit_hold_precedence(self):
         payload = fixture("normal")

@@ -33,7 +33,7 @@ from .config import Settings
 from .coordination import IdentityAccess
 from .ml_client import EnrollmentRefused, IdentityService
 from .physics_engine import analyze_tap_recoil, flag
-from .risk_fusion import decide, eligible_for_enrollment, local_hold
+from .risk_fusion import decide, eligible_for_enrollment, local_hold_reasons
 from .storage import Store
 
 BODY_LIMIT = 1_048_576
@@ -366,7 +366,7 @@ def create_app(settings=None, transport=None):
             physics_ms = round((time.perf_counter() - start) * 1000, 3)
             budget = (
                 LOCAL_HOLD_IDENTITY_BUDGET
-                if local_hold(telemetry["transfer_context"], recoil, coercion, policy)
+                if local_hold_reasons(telemetry["transfer_context"], recoil, coercion, policy)
                 else IDENTITY_BUDGET
             )
             clock = asyncio.get_running_loop().time
@@ -388,7 +388,7 @@ def create_app(settings=None, transport=None):
             op_id = operator.get("matched_operator_id")
             if mode == "mock" and state.store.ban_status(op_id, mode) == "confirmed":
                 operator["is_banned_operator"] = True
-            outcome, scores, overall, flags = decide(
+            outcome, scores, overall, flags, explanation = decide(
                 telemetry, recoil, coercion, ml, policy
             )
             if missed_deadline:
@@ -428,6 +428,7 @@ def create_app(settings=None, transport=None):
                 "account_id": telemetry["account_id"],
                 "account_label": telemetry["account_id"],
                 "decision": outcome,
+                "decision_explanation": explanation,
                 "overall_risk_score": overall,
                 "scores": scores,
                 "flags": flags,

@@ -96,7 +96,8 @@ test("dashboard reconciles duplicate events, preserves unavailable evidence and 
 }) => {
   const missing = fixture("missing_sensors/dashboard-event.json");
   let pushes: () => void = () => {};
-  let events = [event];
+  const historical = { ...event, decision_explanation: undefined };
+  let events: DashboardEvent[] = [historical];
   await page.routeWebSocket("**/ws/dashboard", (ws) => {
     pushes = () => ws.send(JSON.stringify(missing));
   });
@@ -119,14 +120,30 @@ test("dashboard reconciles duplicate events, preserves unavailable evidence and 
   await page.goto("/dashboard");
   await expect(page.getByText("Connected", { exact: true })).toBeVisible();
   await expect(page.getByRole("row")).toHaveCount(2);
-  events = [missing, event];
+  await expect(
+    page.getByText(/This case predates recorded decision reasons/),
+  ).toBeVisible();
+  events = [missing, historical];
   pushes();
   pushes();
   await expect(page.getByRole("row")).toHaveCount(3);
+  await expect(
+    page.getByRole("cell", { name: /Owner comparison unavailable/ }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Inspect " + missing.session_id, exact: true })
     .click();
   await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("heading", { name: "Why another check was requested" }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByText("Tap motion unavailable", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Ban operator" }),
   ).toBeDisabled();

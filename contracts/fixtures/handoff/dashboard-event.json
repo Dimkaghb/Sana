@@ -5,6 +5,16 @@
   "account_id": "acc_student_101",
   "account_label": "Demo account 101",
   "decision": "MIRAGE_HOLD",
+  "decision_explanation": {
+    "policy_version": "demo-1",
+    "reasons": [
+      {
+        "code": "HANDOFF_AMOUNT",
+        "title": "Owner mismatch on a large transfer",
+        "detail": "The identity service reported a possible handoff. The transfer of ₸450,000 met the ₸100,000 hold threshold."
+      }
+    ]
+  },
   "overall_risk_score": 91,
   "scores": {
     "anti_rat_physics_risk": 8,

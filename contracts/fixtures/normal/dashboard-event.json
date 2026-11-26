@@ -5,6 +5,16 @@
   "account_id": "acc_student_101",
   "account_label": "Demo account 101",
   "decision": "SUCCESS",
+  "decision_explanation": {
+    "policy_version": "demo-1",
+    "reasons": [
+      {
+        "code": "BELOW_REVIEW_THRESHOLD",
+        "title": "Transfer met the approval rules",
+        "detail": "No hold rule applied. The highest available component scored 12/100, below the additional-check threshold of 50."
+      }
+    ]
+  },
   "overall_risk_score": 12,
   "scores": {
     "anti_rat_physics_risk": 8,

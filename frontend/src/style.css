@@ -1896,3 +1896,19 @@ body {
   text-align: right;
   font-weight: 550;
 }
+
+.decision-explanation {
+  background: var(--tint);
+  color: var(--ink);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 5px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+.decision-explanation h3 { font-size: 15px; line-height: 1.35; }
+.decision-explanation ul { list-style: none; padding: 0; margin: 10px 0; }
+.decision-explanation li + li { margin-top: 9px; }
+.decision-explanation strong { font-size: 13px; }
+.decision-explanation p { margin: 3px 0; font-size: 13px; line-height: 1.5; }
+.decision-explanation small { font-size: 11px; color: var(--muted); }

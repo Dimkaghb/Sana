@@ -5,6 +5,16 @@
   "account_id": "acc_student_101",
   "account_label": "Demo account 101",
   "decision": "MIRAGE_HOLD",
+  "decision_explanation": {
+    "policy_version": "demo-1",
+    "reasons": [
+      {
+        "code": "BANNED_OPERATOR",
+        "title": "Match to a banned operator profile",
+        "detail": "The identity service matched the session to op_demo_banned, which was banned when this transfer was scored."
+      }
+    ]
+  },
   "overall_risk_score": 100,
   "scores": {
     "anti_rat_physics_risk": 8,

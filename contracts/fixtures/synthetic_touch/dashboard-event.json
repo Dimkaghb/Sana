@@ -5,6 +5,16 @@
   "account_id": "acc_student_101",
   "account_label": "Demo account 101",
   "decision": "MIRAGE_HOLD",
+  "decision_explanation": {
+    "policy_version": "demo-1",
+    "reasons": [
+      {
+        "code": "TOUCH_HOLD",
+        "title": "Tap evidence triggered a hold",
+        "detail": "Touch physics scored 98/100 against a hold threshold of 75."
+      }
+    ]
+  },
   "overall_risk_score": 98,
   "scores": {
     "anti_rat_physics_risk": 98,

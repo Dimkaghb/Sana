@@ -13,6 +13,10 @@ export interface DashboardEvent {
   account_id: string;
   account_label: string;
   decision: Decision["ui_mode"];
+  decision_explanation?: {
+    policy_version: string;
+    reasons: { code: string; title: string; detail: string }[];
+  };
   overall_risk_score: number | null;
   scores: {
     anti_rat_physics_risk: number | null;

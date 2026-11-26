@@ -5,6 +5,16 @@
   "account_id": "acc_student_101",
   "account_label": "Demo account 101",
   "decision": "MIRAGE_HOLD",
+  "decision_explanation": {
+    "policy_version": "demo-1",
+    "reasons": [
+      {
+        "code": "CROSS_ACCOUNT_MATCH",
+        "title": "Similar behavior across accounts",
+        "detail": "The operator match score was 0.930 across 3 linked accounts. The hold rule requires at least two accounts and a score of 0.8 or higher."
+      }
+    ]
+  },
   "overall_risk_score": 93,
   "scores": {
     "anti_rat_physics_risk": 8,
