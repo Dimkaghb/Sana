@@ -37,3 +37,9 @@ Use [the PRD](../PRD.md) and its [source PDF](../Markdown%20Live%20Preview.pdf) 
 - Milestone 8 has a trained baseline and an optional temporal-attention encoder, with [held-out synthetic comparisons](../ml/README.md). Real-participant evaluation and threshold selection are pending. Recipient liveness is an explicit pass/fail simulation. Camera-based rPPG remains an optional research item.
 - Milestone 9 passed the software flow from held session through account-scoped Guardian notification, acknowledgement, freeze, and case export. Actual second-phone notification delivery remains a device rehearsal item.
 - Milestone 10 has a fresh local startup command, private per-run credentials, a single-origin HTTPS server, and a reset procedure that preserves earlier runs. The compiled app completed a TLS rehearsal with zero external browser requests. Physical trust installation, a venue-style LAN with the internet disconnected, and projector legibility at stage distance remain pending. See the [runbook](OFFLINE_REHEARSAL.md).
+
+## Final software verification
+
+The production frontend built successfully. All 19 shared contract tests, 14 backend tests, six ML tests, and nine Chromium browser tests passed. An additional desktop system WebKit check completed a mobile transfer at a 390-pixel viewport. Playwright's bundled WebKit processes crashed before page creation on this host, so that result comes from the installed OS WebKit engine. Neither browser check measures physical phone sensors.
+
+A clean export of the committed tree installed the backend, frontend, and ML dependencies from primed local caches with package-manager offline modes enabled. It built the frontend, trained the synthetic baseline from scratch, passed the seven-scenario HTTP/WebSocket rehearsal, and completed live scoring, enrollment, ring detection, ban, and re-entry. The ready demo served 150 labeled synthetic map points across 18 clusters.

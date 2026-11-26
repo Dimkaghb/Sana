@@ -27,8 +27,8 @@ def stop(process):
         process.wait()
 
 
-def ready(process, url):
-    deadline = time.monotonic() + 180
+def ready(process, url, timeout_seconds):
+    deadline = time.monotonic() + timeout_seconds
     opener = build_opener(ProxyHandler({}))
     while process.poll() is None and time.monotonic() < deadline:
         try:
@@ -98,11 +98,12 @@ def main():
 
         workers = []
         if args.mode == "live":
+            print("Preparing the local identity model and population map…", flush=True)
             ml = start(ROOT / "ml/.venv/bin/python", "ml.app:app", args.ml_port)
-            ready(ml, identity + "/health")
+            ready(ml, identity + "/health", timeout_seconds=600)
             workers.append(ml)
         backend = start(sys.executable, "scripts.stage:local_app", args.port, "--factory")
-        ready(backend, origin + "/ready")
+        ready(backend, origin + "/ready", timeout_seconds=30)
         workers.append(backend)
         print(f"Dashboard: {origin}/dashboard\nMobile: {origin}/mobile\nGuardian: {origin}/guardian"
               f"\nLocal demo credentials: {credentials}\nCtrl-C stops this rehearsal.", flush=True)

@@ -1,6 +1,6 @@
 # Architecture and integration boundaries
 
-Source: PRD pages 1-3, 6-9, and 11. Implementation choices below are proposals where the PRD is silent.
+The runtime implements the shared boundaries in PRD pages 1–3, 6–9, and 11.
 
 ```mermaid
 flowchart TD
@@ -18,7 +18,7 @@ flowchart TD
 
 ## Runtime
 
-Start with one backend worker, an in-memory connection registry, and SQLite. Shared messaging is required before multiple workers. Use an explicit mock ML adapter during development and an async HTTP adapter for live ML; failed live requests must never silently turn into mock scores.
+Run one backend worker with an in-memory connection registry and SQLite. Shared messaging is required before multiple workers. Use an explicit mock ML adapter during development and an async HTTP adapter for live ML; failed live requests must never silently turn into mock scores.
 
 ## Sequence
 
@@ -30,7 +30,7 @@ Start with one backend worker, an in-memory connection registry, and SQLite. Sha
 6. Persist evidence, decision, and policy version atomically.
 7. Broadcast C and return D. Dashboard initialization recovers persisted results after disconnect.
 
-C is a scored-session snapshot, not a continuous IMU stream. The 1.5-second ML timeout does not guarantee a sub-200-ms full response. Early physics holds and later enrichment need an agreed update event.
+Contract C carries the final session snapshot. General identity scoring has a 1.5-second budget. A conclusive local hold has a 75 ms identity budget. When that deadline expires the event records the local evidence, the deadline flag and null identity values. The original decision stays immutable. Full phone latency also includes collection, validation, storage, delivery and network time.
 
 ## Handoffs
 
