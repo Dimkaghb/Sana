@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import secrets
+import signal
 import socket
 import subprocess
 import sys
@@ -55,7 +56,7 @@ async def server(directory, *, mode="mock", ml_url="http://127.0.0.1:8001", ml_t
                     raise TimeoutError("Timed out waiting for demo readiness")
                 yield client, origin, token
         finally:
-            child.terminate()
+            child.send_signal(signal.SIGINT)
             try:
                 child.wait(timeout=5)
             except subprocess.TimeoutExpired:

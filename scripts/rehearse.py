@@ -19,7 +19,7 @@ from scripts.stage import ROOT
 
 def stop(process):
     if process.poll() is None:
-        process.terminate()
+        process.send_signal(signal.SIGINT)
     try:
         process.wait(timeout=8)
     except subprocess.TimeoutExpired:

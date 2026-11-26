@@ -4,6 +4,7 @@ import asyncio
 import os
 from pathlib import Path
 import secrets
+import signal
 import socket
 import subprocess
 import tempfile
@@ -85,7 +86,7 @@ async def main(interpreter, model):
                     raise TimeoutError("Identity service startup timed out")
                 await exercise(directory, url, token)
         finally:
-            child.terminate()
+            child.send_signal(signal.SIGINT)
             try:
                 child.wait(timeout=5)
             except subprocess.TimeoutExpired:
