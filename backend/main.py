@@ -296,6 +296,7 @@ def create_app(settings=None, transport=None):
                 "physics_ms": physics_ms,
                 "recoil": recoil.measurements,
                 "coercion": coercion.measurements,
+                "match_confidence": operator.get("match_confidence"),
                 "linked_account_ids": operator.get("linked_account_ids", []),
                 "amount_kzt": amount,
             }
@@ -313,9 +314,10 @@ def create_app(settings=None, transport=None):
     async def dashboard_init():
         state = app.state
         population = await state.ml.population()
-        events, kpis = state.store.snapshot()
+        events, kpis, identity = state.store.snapshot()
         return {
             "events": events,
+            "session_identity": identity,
             "kpis": kpis,
             "ml_mode": state.config.mode,
             "active_sessions": list(state.phones),

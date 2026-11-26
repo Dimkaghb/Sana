@@ -2,6 +2,8 @@
 
 import json
 import sqlite3
+
+from .risk_fusion import eligible_for_enrollment
 from pathlib import Path
 
 
@@ -85,15 +87,37 @@ class Store:
 
     def snapshot(self):
         rows = self.db.execute(
-            "SELECT event FROM sessions ORDER BY rowid DESC LIMIT 200"
+            """SELECT s.id, s.event,
+                      json_extract(s.dossier,'$.match_confidence') confidence,
+                      json_extract(s.dossier,'$.linked_account_ids') accounts,
+                      json_extract(s.dossier,'$.policy.step_up_threshold') threshold,
+                      json_extract(s.dossier,'$.ml_mode') mode,
+                      json_type(s.dossier,'$.enrollment') enrolled,
+                      b.status ban
+               FROM sessions s LEFT JOIN bans b
+                 ON b.operator=json_extract(s.event,'$.map_point.operator_id')
+                AND b.mode=json_extract(s.dossier,'$.ml_mode')
+               ORDER BY s.rowid DESC LIMIT 200"""
         )
-        events = [json.loads(r["event"]) for r in rows]
+        events, identity = [], {}
+        for row in rows:
+            event = json.loads(row["event"])
+            events.append(event)
+            identity[row["id"]] = {
+                "match_confidence": row["confidence"],
+                "linked_account_ids": json.loads(row["accounts"] or "[]"),
+                "eligible_for_enrollment": (
+                    row["mode"] == "live" and row["ban"] is None
+                    and row["enrolled"] is None and row["threshold"] is not None
+                    and eligible_for_enrollment(event, row["threshold"])
+                ),
+            }
         kpis = self.db.execute("""
             SELECT COUNT(*) sessions, COALESCE(SUM(CASE WHEN json_extract(decision,'$.ui_mode')='MIRAGE_HOLD'
               THEN amount ELSE 0 END),0) held_amount_kzt, COUNT(DISTINCT ring) ring_count,
               AVG(inference) average_inference_ms FROM sessions
         """).fetchone()
-        return events, dict(kpis)
+        return events, dict(kpis), identity
 
     def set_ban(self, operator, mode, status):
         with self.db:

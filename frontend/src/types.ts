@@ -27,6 +27,14 @@ export interface DashboardData {
   events: DashboardEvent[];
   ml_mode: "mock" | "live";
   active_sessions: string[];
+  session_identity?: Record<
+    string,
+    {
+      match_confidence: number | null;
+      linked_account_ids: string[];
+      eligible_for_enrollment: boolean;
+    }
+  >;
   population_map: {
     points: (MapPoint & {
       session_id?: string;

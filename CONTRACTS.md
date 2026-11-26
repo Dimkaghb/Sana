@@ -88,7 +88,7 @@ The demo uses the maximum available component score, or null when all components
 
 ## Runtime interfaces
 
-Dashboard initialization returns persisted recent events and the active ML mode. Open the dashboard WebSocket before taking the recovery snapshot and reconcile by session ID. Keep the browser SDK and frontend decoupled through the SDK public entry point. Administrative credentials are configured on the server. Authorized users enter their scoped credentials at runtime.
+Dashboard initialization returns persisted recent events and the active ML mode. Its session_identity object maps those session IDs to the stored match confidence, linked account IDs and analyst enrollment eligibility. Similarity values are scores, not calibrated probabilities. Older dossiers can lack a stored confidence. Open the dashboard WebSocket before taking the recovery snapshot and reconcile by session ID. Keep the browser SDK and frontend decoupled through the SDK public entry point. Administrative credentials are configured on the server. Authorized users enter their scoped credentials at runtime.
 
 Contract A keeps the original complete measurement records. Omit incomplete observations, including keys without both timing and offset or motion samples without orientation. Partial measurements would need a future contract extension. The backend accesses ML over HTTP and enrolls only explicitly verified sessions. A case download contains a prototype incident record. Any official submission needs a separate receiving specification.
 

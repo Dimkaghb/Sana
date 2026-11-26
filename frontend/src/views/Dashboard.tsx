@@ -149,25 +149,23 @@ export function Dashboard() {
   const active = data?.active_sessions || [];
   const liveTarget = active.includes(target) ? target : active[0];
   const selectedEvent = events.find((e) => e.session_id === dot?.session_id);
+  const sessionIdentity =
+    selectedEvent && data?.session_identity?.[selectedEvent.session_id];
   const canEnroll =
     !preview &&
     data?.ml_mode === "live" &&
     dot?.status !== "BANNED" &&
     !dot?.synthetic &&
-    selectedEvent?.map_point &&
-    selectedEvent.decision !== "MIRAGE_HOLD" &&
-    [
-      selectedEvent.scores.anti_rat_physics_risk,
-      selectedEvent.scores.coercion_stress_risk,
-      selectedEvent.overall_risk_score,
-    ].every((s) => s != null && s < 50) &&
-    selectedEvent.flags.every((f) => f.code === "IDENTITY_UNAVAILABLE");
+    sessionIdentity?.eligible_for_enrollment;
   const fixtureIdentity =
     preview && selectedEvent
       ? fixtureIdentities[selectedEvent.session_id]
       : undefined;
+  const confidence =
+    fixtureIdentity?.match_confidence ?? sessionIdentity?.match_confidence;
   const linked =
     fixtureIdentity?.linked_account_ids ||
+    sessionIdentity?.linked_account_ids ||
     (Array.isArray(dossier?.linked_account_ids)
       ? dossier.linked_account_ids.filter(
           (id): id is string => typeof id === "string",
@@ -626,10 +624,12 @@ export function Dashboard() {
                   <p>
                     {(linked || visibleAccounts).join(" · ") || "Unavailable"}
                   </p>
-                  {fixtureIdentity?.match_confidence != null && (
+                  {confidence != null && (
                     <p>
-                      Fixture match confidence ·{" "}
-                      {Math.round(fixtureIdentity.match_confidence * 100)}%
+                      {preview || data?.ml_mode === "mock"
+                        ? "Fixture match"
+                        : "Operator match"}{" "}
+                      · {Math.round(confidence * 100)}%
                     </p>
                   )}
                 </div>

@@ -224,6 +224,13 @@ test("clean live session enrollment requires independent verification and analys
     r.fulfill({
       json: {
         ml_mode: "live",
+        session_identity: {
+          [event.session_id]: {
+            match_confidence: 0.89,
+            linked_account_ids: [event.account_id],
+            eligible_for_enrollment: true,
+          },
+        },
         events: [event],
         active_sessions: [],
         population_map: null,
@@ -256,6 +263,7 @@ test("clean live session enrollment requires independent verification and analys
   await page
     .getByRole("button", { name: "Inspect " + event.session_id, exact: true })
     .click();
+  await expect(page.getByText("Operator match · 89%")).toBeVisible();
   const enroll = page.getByRole("button", { name: "Enroll verified session" });
   await expect(enroll).toBeDisabled();
   await page
