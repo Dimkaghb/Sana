@@ -1,4 +1,5 @@
 """Optional local, per-session consented recording for a supervised calibration."""
+
 import hashlib
 import os
 import tempfile

@@ -1,4 +1,5 @@
 """SQLite is the source of truth for completed sessions and Guardian actions."""
+
 import json
 import sqlite3
 from pathlib import Path
@@ -26,18 +27,40 @@ class Store:
         """)
 
     def session(self, session_id):
-        return self.db.execute("SELECT * FROM sessions WHERE id=?", (session_id,)).fetchone()
+        return self.db.execute(
+            "SELECT * FROM sessions WHERE id=?", (session_id,)
+        ).fetchone()
 
     def save(self, digest, event, decision, dossier, amount, inference, ring):
         with self.db:
-            self.db.execute("""INSERT INTO sessions
+            self.db.execute(
+                """INSERT INTO sessions
                 (id,account,digest,event,decision,dossier,amount,inference,ring)
-                VALUES (?,?,?,?,?,?,?,?,?)""", (
-                event["session_id"], event["account_id"], digest, json.dumps(event),
-                json.dumps(decision), json.dumps(dossier), amount, inference, ring))
+                VALUES (?,?,?,?,?,?,?,?,?)""",
+                (
+                    event["session_id"],
+                    event["account_id"],
+                    digest,
+                    json.dumps(event),
+                    json.dumps(decision),
+                    json.dumps(dossier),
+                    amount,
+                    inference,
+                    ring,
+                ),
+            )
+
+    def cache_fingerprint(self, session, value):
+        with self.db:
+            self.db.execute(
+                "UPDATE sessions SET dossier=json_set(dossier,'$.operator_fingerprint',?) WHERE id=?",
+                (value, session),
+            )
 
     def snapshot(self):
-        rows = self.db.execute("SELECT event FROM sessions ORDER BY rowid DESC LIMIT 200")
+        rows = self.db.execute(
+            "SELECT event FROM sessions ORDER BY rowid DESC LIMIT 200"
+        )
         events = [json.loads(r["event"]) for r in rows]
         kpis = self.db.execute("""
             SELECT COUNT(*) sessions, COALESCE(SUM(CASE WHEN json_extract(decision,'$.ui_mode')='MIRAGE_HOLD'
@@ -48,24 +71,40 @@ class Store:
 
     def set_ban(self, operator, mode, status):
         with self.db:
-            self.db.execute("INSERT OR REPLACE INTO bans VALUES (?,?,?)", (operator, mode, status))
+            self.db.execute(
+                "INSERT OR REPLACE INTO bans VALUES (?,?,?)", (operator, mode, status)
+            )
 
     def ban_status(self, operator, mode):
-        row = self.db.execute("SELECT status FROM bans WHERE operator=? AND mode=?", (operator, mode)).fetchone()
+        row = self.db.execute(
+            "SELECT status FROM bans WHERE operator=? AND mode=?", (operator, mode)
+        ).fetchone()
         return row["status"] if row else None
 
     def guardian_holds(self, account):
-        rows = self.db.execute("""SELECT id, account, amount, event, decision, frozen FROM sessions
+        rows = self.db.execute(
+            """SELECT id, account, amount, event, decision, frozen FROM sessions
             WHERE account=? AND json_extract(decision,'$.ui_mode')='MIRAGE_HOLD'
-            ORDER BY rowid DESC LIMIT 200""", (account,))
-        return [dict(session_id=r["id"], account_id=r["account"], amount_kzt=r["amount"],
-                     reference_code=json.loads(r["decision"])["reference_code"],
-                     status="frozen" if r["frozen"] else "held",
-                     timestamp=json.loads(r["event"])["timestamp"]) for r in rows]
+            ORDER BY rowid DESC LIMIT 200""",
+            (account,),
+        )
+        return [
+            {
+                "session_id": r["id"],
+                "account_id": r["account"],
+                "amount_kzt": r["amount"],
+                "reference_code": json.loads(r["decision"])["reference_code"],
+                "status": "frozen" if r["frozen"] else "held",
+                "timestamp": json.loads(r["event"])["timestamp"],
+            }
+            for r in rows
+        ]
 
     def guardian_action(self, account, session, freeze):
         with self.db:
-            cursor = self.db.execute("""UPDATE sessions SET acknowledged=1, frozen=MAX(frozen,?)
+            cursor = self.db.execute(
+                """UPDATE sessions SET acknowledged=1, frozen=MAX(frozen,?)
                 WHERE id=? AND account=? AND json_extract(decision,'$.ui_mode')='MIRAGE_HOLD'""",
-                                     (int(freeze), session, account))
+                (int(freeze), session, account),
+            )
         return cursor.rowcount == 1
