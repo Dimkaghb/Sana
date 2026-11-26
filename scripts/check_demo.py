@@ -29,6 +29,11 @@ async def server(directory, *, mode="mock", ml_url="http://127.0.0.1:8001", ml_t
         env = dict(os.environ, ML_MODE=mode, ML_SERVICE_URL=ml_url, ML_ADMIN_TOKEN=ml_token,
                    SANA_DB=str(directory / "sessions.sqlite"),
                    SANA_ALLOWED_ORIGINS=origin, SANA_ADMIN_TOKEN=token, SANA_GUARDIAN_TOKENS="{}")
+        # Verify the default policy independently of the operator’s active configuration.
+        for key in ("SANA_RECOIL_FLOOR", "SANA_POLICY_VERSION", "SANA_STEP_UP_THRESHOLD",
+                    "SANA_HOLD_THRESHOLD", "SANA_HANDOFF_AMOUNT", "SANA_RING_CONFIDENCE",
+                    "SANA_CALIBRATION_DIR"):
+            env.pop(key, None)
         child = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "backend.main:app", "--fd", str(listener.fileno()),
              "--log-level", "warning", "--no-access-log"],

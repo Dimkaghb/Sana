@@ -16,12 +16,14 @@ def build_app(dist: Path):
     from fastapi.responses import FileResponse
     from starlette.staticfiles import StaticFiles
 
-    from backend.main import app
+    from backend.main import create_app
 
     dist = dist.resolve(strict=True)
     index = dist / "index.html"
     if not index.is_file():
         raise RuntimeError("Build the frontend before starting the stage server.")
+
+    app = create_app()
 
     # Register known client routes only. Missing API paths must stay 404s.
     async def client_page():

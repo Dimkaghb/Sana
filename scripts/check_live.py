@@ -62,6 +62,8 @@ async def main(interpreter, model):
         token = secrets.token_urlsafe()
         env = dict(os.environ, ML_DATA_DIR=str(directory / "identity"), ML_MODEL_DIR=str(model.resolve()),
                    ML_SEED_POPULATION="0", ML_ADMIN_TOKEN=token)
+        for key in ("ML_QDRANT_URL", "ML_QDRANT_API_KEY", "ML_CALIBRATION_MANIFEST"):
+            env.pop(key, None)
         child = subprocess.Popen(
             [str(interpreter.absolute()), "-m", "uvicorn", "ml.app:app", "--fd", str(listener.fileno()),
              "--log-level", "warning", "--no-access-log"],
