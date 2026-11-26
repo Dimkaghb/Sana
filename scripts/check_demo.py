@@ -7,6 +7,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+from time import perf_counter
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -67,7 +68,9 @@ async def verify(directory):
                 payload = load_json(FIXTURES / files["A"])
                 expected_mode = load_json(FIXTURES / files["D"])["ui_mode"]
                 route = "/api/v1/sessions/ingest"
+                started = perf_counter()
                 response = await client.post(route, json=payload)
+                elapsed_ms = (perf_counter() - started) * 1000
                 response.raise_for_status()
                 decision = response.json()
                 event = json.loads(await asyncio.wait_for(dashboard.recv(), 5))
@@ -85,7 +88,8 @@ async def verify(directory):
                                            headers={"Authorization": f"Bearer {token}"})
                 dossier.raise_for_status()
                 assert dossier.json()["case_id"] == decision["reference_code"]
-                print(f'{scenario["name"]}: {expected_mode}')
+                physics_ms = dossier.json()["physics_ms"]
+                print(f'{scenario["name"]}: {expected_mode} (HTTP {elapsed_ms:.1f} ms, physics {physics_ms:.2f} ms)')
     async with server(directory) as (client, _, _):
         snapshot = (await client.get("/api/v1/dashboard/init")).json()
         ids = [event["session_id"] for event in snapshot["events"]]
