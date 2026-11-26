@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SANA Shield · BCC hackathon presentation</title>
+<style>
+* {box-sizing:border-box}
+body {margin:0;background:#0b1619;color:#f0f6f3;font:clamp(18px,2.6vw,42px)/1.36 "Arial",sans-serif}
+main {width:min(100%,1700px);margin:auto}
+section {padding:8vh 8vw;min-height:100svh;display:flex;flex-direction:column;justify-content:center;gap:1.1em}
+section[hidden] {display:none}
+h1,h2,p,ol,dl,dd {margin:0} h1,h2 {letter-spacing:-.055em;line-height:1.02;text-wrap:balance}
+h1 {font-size:clamp(60px,10vw,180px)} h2 {font-size:clamp(36px,5.8vw,98px)}
+p,ol,dl {max-width:32em} small {font-size:.55em} a {color:inherit}
+dt,strong {color:#7be3af} dd {margin-bottom:.55em}
+.light {background:#e5f1e9;color:#113b30}.light strong {color:#006741}
+ol {padding-left:1.25em} li {padding:.18em}
+nav {position:fixed;bottom:2vh;right:3vw;display:flex;align-items:center;gap:.6rem;background:#102825;color:white;border-radius:2rem;padding:.28rem .65rem;font:15px Arial}
+button {border:0;background:transparent;color:inherit;font:22px Arial;padding:.35em;cursor:pointer}
+@media print {section,section[hidden] {display:flex;height:100vh;break-after:page} nav {display:none} @page {size:landscape;margin:0} body {print-color-adjust:exact}}
+</style>
+</head><body><main>
+<section><h1>SANA Shield</h1><p>Behavioral checks during a bank transfer</p><small>Bank CenterCredit case · ITU Hackathon 2026</small></section>
+<section class="light"><h2>Fraud can start after login</h2><p><strong>80,871</strong> incidents involving transactions with signs of fraud were registered by Kazakhstan’s Anti-Fraud Center by January 1, 2026.</p><p>A valid login leaves a question open. Who is operating the account when the money moves?</p><small><a href="https://nationalbank.kz/ru/news/informacionnye-soobshcheniya/18571">National Bank of Kazakhstan, February 4, 2026</a></small></section>
+<section><h2>What the phone can measure</h2><dl><dt>Touch and motion</dt><dd>Compare a tap with the phone’s acceleration around that instant.</dd><dt>Rhythm and trajectory</dt><dd>Measure keypad timing and the path of the confirmation slider.</dd></dl><p>Recipient digits stay out of telemetry. A denied sensor permission leaves a gap in the evidence.</p></section>
+<section class="light"><h2>How a transfer is scored</h2><ol><li><strong>Phone → FastAPI</strong> · Send a bounded telemetry session over HTTPS.</li><li><strong>Physics and identity</strong> · Inspect tap recoil and cadence. Compare a 128-dimensional embedding with prior sessions.</li><li><strong>Policy → SQLite</strong> · Persist the decision, return the mobile receipt, and update the analyst over WebSocket.</li></ol></section>
+<section><h2>One operator, multiple accounts</h2><p>Owner verification compares a session with an explicitly enrolled account baseline.</p><p>Cross-account search checks whether similar sessions recur under different account IDs. The analyst can inspect which accounts contributed to a ring alert.</p></section>
+<section class="light"><h2>What a customer sees</h2><dl><dt>Success</dt><dd>The mobile app returns a simulated receipt.</dd><dt>Step-up</dt><dd>Additional verification is required when evidence is incomplete or risk is elevated.</dd><dt>Mirage hold</dt><dd>The app shows a calm processing message while the analyst reviews the case.</dd></dl></section>
+<section><h2>Live transfer demonstration</h2><ol><li>Submit a transfer and inspect its waveform.</li><li>Trigger a simulated interaction on the active phone.</li><li>Inspect a handoff, linked accounts and a case dossier.</li></ol><small>Demo outcomes depend on sensor coverage, enrollment, and the selected ML mode.</small></section>
+<section class="light"><h2>A pilot for BCC transfers</h2><p>Begin with a consented mobile-transfer pilot. Measure false holds, missed handoffs and response time across phones before considering JuniorBank or business accounts.</p><p>Analysts can review a local dossier. Sharing cases with the national center would require a separate integration.</p></section>
+</main><nav aria-label="Slide navigation"><button id="prev" aria-label="Previous slide">←</button><span id="count" aria-live="polite"></span><button id="next" aria-label="Next slide">→</button></nav>
+<script>
+const slides = Array.from(document.querySelectorAll('section'));
+let current = 0;
+function show(index) {
+  current = Math.max(0, Math.min(slides.length - 1, index));
+  slides.forEach((slide, i) => { slide.hidden = i !== current; });
+  document.body.classList.toggle('light', slides[current].classList.contains('light'));
+  document.querySelector('#count').textContent = (current + 1) + ' / ' + slides.length;
+  document.querySelector('#prev').disabled = current === 0;
+  document.querySelector('#next').disabled = current === slides.length - 1;
+}
+document.querySelector('#next').onclick = () => show(current + 1);
+document.querySelector('#prev').onclick = () => show(current - 1);
+document.addEventListener('keydown', event => {
+  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+    event.preventDefault();
+    show(current + (event.key === 'ArrowRight' ? 1 : -1));
+  }
+});
+show(0);
+</script></body></html>
