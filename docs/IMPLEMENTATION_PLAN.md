@@ -4,7 +4,7 @@ Source: `Markdown Live Preview.pdf`, especially pages 6-7 and 10-11. Preserve it
 
 ## Step 1 - Repository foundation and contracts
 
-**Status: in progress until validation completes.**
+**Verified locally.** Four schemas, 27 fixtures, seven scenarios, and 19 shared contract tests passed.
 
 - Establish rules, PRD folder layout, ignored artifacts, and ownership docs.
 - Express Contracts A-D as JSON Schema without renaming fields.
@@ -15,6 +15,8 @@ Source: `Markdown Live Preview.pdf`, especially pages 6-7 and 10-11. Preserve it
 Exit: teammates have valid examples and clear ownership without any services running; repository checks pass.
 
 ## Step 2 - Minimal backend and complete fixture-driven flow
+
+**Local fixture flow verified** with the standalone demo check. Trusted real-phone connectivity remains a field check.
 
 Dependencies: Step 1. Settle dashboard init, unavailable-result representation, and general risk semantics before freezing runtime models.
 

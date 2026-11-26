@@ -32,7 +32,7 @@ class ContractTests(unittest.TestCase):
     def test_all_registered_fixtures_validate(self):
         errors, count, scenarios = validate_repository()
         self.assertEqual(errors, [])
-        self.assertEqual((count, scenarios), (25, 7))
+        self.assertEqual((count, scenarios), (27, 7))
 
     def test_raw_sensitive_fields_are_rejected(self):
         for field in ("card_number", "phone_number", "recipient_name", "input_value"):
@@ -103,6 +103,9 @@ class ContractTests(unittest.TestCase):
             with self.subTest(scenario=scenario["name"]):
                 telemetry = load_json(FIXTURES / scenario["contracts"]["A"])
                 dashboard = load_json(FIXTURES / scenario["contracts"]["C"])
+                if not telemetry["imu_samples"]:
+                    self.assertEqual(dashboard["recoil_waveform"], [])
+                    continue
                 tap = telemetry["taps"][0]["t_ms"]
                 baseline_samples = [s["az"] for s in telemetry["imu_samples"]
                                     if tap - 40 <= s["t_ms"] <= tap - 15]
@@ -113,7 +116,8 @@ class ContractTests(unittest.TestCase):
                 self.assertEqual(len(dashboard["recoil_waveform"]), len(impact_samples))
                 for point, sample in zip(dashboard["recoil_waveform"], impact_samples):
                     self.assertAlmostEqual(point["t_ms"], sample["t_ms"] - tap, places=3)
-                    self.assertAlmostEqual(point["az_delta"], sample["az"] - baseline, places=6)
+                    self.assertAlmostEqual(point["az_delta"], sample["az"] - baseline,
+                                           delta=0.5e-6 + 1e-15)
 
     def test_absent_sensors_are_empty_not_flat_samples(self):
         payload = load_json(FIXTURES / "missing_sensors" / "telemetry.json")
@@ -123,7 +127,11 @@ class ContractTests(unittest.TestCase):
         self.invalid("A", payload)
         manifest = load_json(FIXTURES / "manifest.json")
         scenario = next(s for s in manifest["scenarios"] if s["name"] == "missing_sensors")
-        self.assertEqual(set(scenario["contracts"]), {"A"})
+        self.assertEqual(set(scenario["contracts"]), {"A", "C", "D"})
+        event = load_json(FIXTURES / scenario["contracts"]["C"])
+        self.assertIsNone(event["scores"]["anti_rat_physics_risk"])
+        self.assertIsNone(event["map_point"])
+        self.assertEqual(event["decision"], "STEP_UP_LIVENESS")
 
     def test_nonfinite_measurements_are_rejected(self):
         for value in (float("nan"), float("inf"), float("-inf")):

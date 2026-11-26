@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:sana-shield:contract:C:1.0.0",
+  "$id": "urn:sana-shield:contract:C:1.1.0",
   "title": "DashboardRealtimeEvent",
   "type": "object",
   "description": "Contract C: backend -> dashboard. A completed session snapshot, not continuous telemetry.",
@@ -37,7 +37,10 @@
       ]
     },
     "overall_risk_score": {
-      "type": "number",
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
       "maximum": 100
     },
@@ -45,17 +48,26 @@
       "type": "object",
       "properties": {
         "anti_rat_physics_risk": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 100
         },
         "coercion_stress_risk": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 100
         },
         "operator_mismatch_risk": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 100
         }
@@ -118,7 +130,10 @@
       }
     },
     "map_point": {
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "properties": {
         "x": {
           "type": "number"

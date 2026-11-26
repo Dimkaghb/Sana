@@ -1,6 +1,6 @@
 # Shared data contracts
 
-**Version: 1.0.0 foundation.** Source: PRD section 3 (pages 2-4), with Person Two behavior on pages 6-7. Field names and nesting are preserved. Schemas describe the complete PRD example shapes; operational extensions remain explicitly open below.
+**Version 1.1.0.** Source: PRD section 3 (pages 2-4), with Person Two behavior on pages 6-7. Field names and nesting are preserved. Schemas describe the complete PRD example shapes; operational extensions remain explicitly open below.
 
 Do not silently alter fields. Update schemas, this document, affected fixtures, and consumers together. Sample values are examples, not fixed constants unless explicitly stated (128 dimensions, event type, and decision modes).
 
@@ -13,9 +13,9 @@ Do not silently alter fields. Update schemas, this document, affected fixtures, 
 | C: `DashboardRealtimeEvent` | Backend -> `WS /ws/dashboard` | [C](contracts/schemas/dashboard-event.schema.json) |
 | D: `MobileTransferDecision` | Ingest response -> mobile | [D](contracts/schemas/mobile-decision.schema.json) |
 
-All example fields are required. All objects reject extra properties, including nested objects, to catch drift and accidental text collection. Arrays may be empty where no observations exist. Numeric values must be finite. An unknown measurement is not encoded as zero; incomplete records must not be fabricated to satisfy a schema. Nullable partial measurements require an explicit extension before use.
+All field names remain required. In v1.1, unavailable scores and the missing dashboard map point accept JSON null. Consumers of v1.0 must handle these values before upgrading. All objects reject extra properties, including nested objects, to catch drift and accidental text collection. Arrays may be empty where no observations exist. Numeric values must be finite. An unknown measurement is not encoded as zero; incomplete records must not be fabricated to satisfy a schema. Nullable partial measurements require an explicit extension before use.
 
-JSON Schema validates shapes/ranges. The repository validator additionally checks timing order, duration coverage, ring cardinality, and cross-contract identity/decision coherence. Runtime payload-size limits and authorization are Step 2 work.
+JSON Schema validates shapes/ranges. The repository validator additionally checks timing order, duration coverage, ring cardinality, and cross-contract identity/decision coherence. Runtime ingestion also enforces byte and stream-size limits.
 
 ## A - Telemetry semantics
 
@@ -47,21 +47,21 @@ The sample-rate zero sentinel, precise offset normalization, fractional timestam
 ## B - Identity evidence
 
 - `embedding_dim` is exactly 128. `embedding_preview` contains 1-128 components, not necessarily the complete vector; do not normalize or hash the preview as though it were the full embedding.
-- Cosine similarity ranges from -1 to 1; match confidence ranges from 0 to 1. Neither fixture value is a calibrated probability.
+- Available cosine similarity ranges from -1 to 1 and available match confidence ranges from 0 to 1. Use null similarity without a verified owner baseline and null confidence for a newly allocated operator without a prior match. Neither fixture value is a calibrated probability.
 - `baseline_sessions_count` is nonnegative. Zero baseline sessions must not be interpreted as proven owner verification.
 - `linked_account_ids` is unique; `ring_size` equals its cardinality for these complete-list contracts.
 - `map_point` contains x/y and integer cluster ID; `inference_ms` is ML-reported duration, distinct from backend end-to-end latency.
-- Missing operator identity, unavailable map projection, and ML error responses are not specified by the PRD's complete example. Do not manufacture values; settle the extension in Step 2 with Person Three.
+- When ML cannot score the session, there is no Contract B. The backend can still return a decision using the available physical evidence.
 
 ## C - Dashboard snapshot
 
 - `type` is `SESSION_SCORED`; `timestamp` is a UTC RFC 3339 timestamp ending in `Z`.
-- `session_id` and `account_id` match A. All risk scores are in [0,100].
+- `session_id` and `account_id` match A. Available risk scores are in [0,100]. Each component and the overall score accept null. With no B, map_point is null.
 - `decision` uses the same three outcomes as D. Both outputs represent the same persisted decision.
 - `account_label` is a fictional demo display label or approved account alias; the telemetry SDK does not collect names.
 - Flag entries contain `code`, `severity`, `title`, and `detail`. The PRD establishes `ZERO_RECOIL_RAT`, `ACCOUNT_HANDOFF`, `DROPPER_RING_MATCH`, `DICTATION_COERCION`, and `HAND_TREMOR`. Fixtures additionally use `BANNED_OPERATOR`; this is an additive example code, not a closed enum change.
 - Severity/status strings remain open because the PRD does not define complete enums. Fixtures use `CRITICAL` severity and `NORMAL`/`CRITICAL` map statuses.
-- `recoil_waveform.t_ms` is relative to the selected tap and can be negative; `az_delta` is baseline-relative m/s^2. If UI displays g, convert explicitly.
+- `recoil_waveform.t_ms` is relative to the selected tap and can be negative; `az_delta` is baseline-relative m/s^2. Fixtures round waveform amplitudes to six decimal places. Compare within half of the final decimal unit plus floating-point evaluation error. If UI displays g, convert explicitly.
 - C's map coordinates/cluster/operator match B when B is present.
 
 C is a completed-session event, not the streaming protocol for a continuously updating oscilloscope. Do not present an unmeasured inference result or absent sensor score as a numeric zero just to fill this shape.
@@ -82,28 +82,18 @@ Evaluate these PRD hold rules before the general score:
 4. Ring size >= 2 and match confidence >= 0.80.
 5. Coercion score >= 75 and new recipient.
 
-The PRD assigns `STEP_UP_LIVENESS` to overall scores 50-74 and `SUCCESS` below 50. Its overall-score formula and >=75 cases without an explicit hold are unresolved. Proposed default: maximum available component score, explicit hold precedence, otherwise step-up at >=50. This remains a proposal until runtime policy is documented in Step 2; fixture scores do not implement the policy.
+The demo uses the maximum available component score, or null when all components are unavailable. After the explicit holds, unavailable identity or recoil evidence or a score of at least 50 triggers step-up. Otherwise the transfer succeeds. The policy and thresholds describe a simulated decision. Calibration requires separate observations.
 
-## Open interfaces and decisions
+## Runtime interfaces
 
-| Item | Owner(s) | Required resolution |
-| --- | --- | --- |
-| Partial motion/keyboard records | Persons Two + Three | Nullable/capability representation; absent values must not become zeros |
-| Unavailable ML/map/component score | All three | Optional/null status and dashboard behavior, with synchronized schema changes |
-| Dashboard init | Persons One + Two + Three | Points, clusters, recent alerts, KPI definitions, pagination/recovery boundary |
-| Population map and ban | Persons Two + Three | Exact request/response schemas and confirmation/error behavior |
-| Safe baseline updates | Persons Two + Three | Decision feedback or safe enrollment before centroid updates |
-| Operator fingerprint | Persons Two + Three | Stable full-vector fingerprint supplied by ML; preview is insufficient |
-| <200 ms hold vs 1.5 s ML timeout | Persons One + Two | Separate latency targets, or explicit early-hold/enrichment event |
-| Demo/reset and Guardian | Persons One + Two | Authentication, command acknowledgment, delivery/freeze state and reset scope |
-| Official dossier | Person Two | Prototype schema now; official receiving specification needed before compatibility claims |
+Dashboard initialization returns persisted recent events and the active ML mode. Open the dashboard WebSocket before taking the recovery snapshot and reconcile by session ID. Keep the browser SDK and frontend decoupled through the SDK public entry point. Administrative credentials are configured on the server. Authorized users enter their scoped credentials at runtime.
 
-Keep the initial complete-example fixtures usable while these are resolved. No public integration is claimed ready while the required failure modes remain unspecified.
+Contract A keeps the original complete measurement records. Omit incomplete observations, including keys without both timing and offset or motion samples without orientation. Partial measurements would need a future contract extension. The backend accesses ML over HTTP and enrolls only explicitly verified sessions. A case download contains a prototype incident record. Any official submission needs a separate receiving specification.
 
 ## Fixtures and checks
 
-`contracts/fixtures/manifest.json` lists seven synthetic scenarios. Normal, synthetic touch, dictation, handoff, ring, and banned operator include A-D. Missing sensors includes A only: B/C/D are intentionally absent because the missing-evidence response is not settled. This is a missing-data example, not a successful score or physics result.
+`contracts/fixtures/manifest.json` lists seven synthetic scenarios. Normal, synthetic touch, dictation, handoff, ring, and banned operator include A-D. Missing sensors includes A, C and D and illustrates step-up with unavailable motion and identity evidence. Its waveform is empty.
 
-Synthetic IMU/key timings are constructed examples; B embeddings/identity matches and C scores/map points are hand-authored illustrative data. They are not algorithm outputs or calibration datasets. Do not report fixture checks as detection accuracy. `STEP_UP_LIVENESS` enum compatibility is tested even though no full gray-zone fixture is frozen yet.
+Synthetic IMU/key timings are constructed examples. Fixture embeddings, scores and map points are hand-authored illustrations. Evaluate algorithm performance separately.
 
 Run `python scripts/validate_contracts.py` and `python -m unittest discover -s tests -v` from the repo root in the configured environment.

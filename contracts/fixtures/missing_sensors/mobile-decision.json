@@ -1,0 +1,8 @@
+{
+  "session_id": "sess_fixture_missing_sensors",
+  "ui_mode": "STEP_UP_LIVENESS",
+  "display_title": "Подтвердите перевод",
+  "display_subtitle": "Требуется дополнительная проверка.",
+  "reference_code": "DEMO-STEP-UP",
+  "guardian_notified": false
+}

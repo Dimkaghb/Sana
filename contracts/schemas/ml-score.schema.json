@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:sana-shield:contract:B:1.0.0",
+  "$id": "urn:sana-shield:contract:B:1.1.0",
   "title": "MLScoreResponse",
   "type": "object",
   "description": "Contract B: ML -> backend. Preview is not a full embedding or a probability.",
@@ -28,7 +28,10 @@
       "type": "object",
       "properties": {
         "cosine_similarity": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": -1,
           "maximum": 1
         },
@@ -56,7 +59,10 @@
           "maxLength": 128
         },
         "match_confidence": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 1
         },

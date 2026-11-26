@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scenarios": [
     {
       "name": "normal",
@@ -15,9 +15,9 @@
     },
     {
       "name": "missing_sensors",
-      "description": "A only. No motion is available; output semantics are unresolved.",
+      "description": "Motion and identity unavailable; illustrative step-up.",
       "synthetic": true,
-      "contracts": {"A":"missing_sensors/telemetry.json"}
+      "contracts": {"A":"missing_sensors/telemetry.json","C":"missing_sensors/dashboard-event.json","D":"missing_sensors/mobile-decision.json"}
     },
     {
       "name": "dictation",

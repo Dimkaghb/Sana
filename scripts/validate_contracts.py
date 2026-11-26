@@ -114,6 +114,8 @@ def validate_bundle(bundle):
         errors.append("C decision must equal D ui_mode")
     if "B" in bundle and "C" in bundle:
         b, c = bundle["B"], bundle["C"]
+        if c["map_point"] is None:
+            return errors + ["C must include the available B map point"]
         for key in ("x", "y", "cluster_id"):
             if b["map_point"][key] != c["map_point"][key]:
                 errors.append(f"map_point.{key} must agree across B and C")

@@ -1,0 +1,24 @@
+{
+  "type": "SESSION_SCORED",
+  "timestamp": "2026-11-26T14:22:01Z",
+  "session_id": "sess_fixture_missing_sensors",
+  "account_id": "acc_student_101",
+  "account_label": "Demo account 101",
+  "decision": "STEP_UP_LIVENESS",
+  "overall_risk_score": null,
+  "scores": {
+    "anti_rat_physics_risk": null,
+    "coercion_stress_risk": null,
+    "operator_mismatch_risk": null
+  },
+  "flags": [
+    {
+      "code": "INSUFFICIENT_EVIDENCE",
+      "severity": "INFO",
+      "title": "Additional verification required",
+      "detail": "Motion and identity scores are unavailable in this example."
+    }
+  ],
+  "recoil_waveform": [],
+  "map_point": null
+}
