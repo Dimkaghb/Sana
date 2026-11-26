@@ -98,7 +98,9 @@ def decide(telemetry, recoil: Evidence, coercion: Evidence, ml, policy: Policy):
         reasons.append(reason("HANDOFF_AMOUNT", "Owner mismatch on a large transfer",
                               f"The identity service reported a possible handoff. The transfer of ₸{context['amount_kzt']:,} met the ₸{policy.handoff_amount:,} hold threshold."))
     reasons.extend(local_hold_reasons(context, recoil, coercion, policy))
-    if reasons:
+    if any(r["code"] == "COERCION_NEW_RECIPIENT" for r in reasons):
+        decision = "STEALTH_HOLD"
+    elif reasons:
         decision = "MIRAGE_HOLD"
     else:
         if identity_risk is None:
@@ -127,7 +129,7 @@ def eligible_for_enrollment(event, step_up_threshold):
         event["scores"]["coercion_stress_risk"],
     )
     return (
-        event["decision"] != "MIRAGE_HOLD"
+        event["decision"] not in {"MIRAGE_HOLD", "STEALTH_HOLD"}
         and event["map_point"] is not None
         and all(
             score is not None and score < step_up_threshold for score in physical_scores

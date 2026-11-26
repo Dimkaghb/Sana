@@ -34,6 +34,11 @@ class Store:
                 id INTEGER PRIMARY KEY CHECK(id=1), sessions INTEGER NOT NULL,
                 held_amount REAL NOT NULL, inference_sum REAL NOT NULL, inference_count INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS guardian_push_key (id INTEGER PRIMARY KEY CHECK(id=1), pem BLOB NOT NULL);
+            CREATE TABLE IF NOT EXISTS guardian_push_devices (
+                endpoint TEXT PRIMARY KEY, account TEXT NOT NULL, pending TEXT,
+                queued_at INTEGER, next_attempt INTEGER, attempts INTEGER NOT NULL DEFAULT 0
+            );
             CREATE TABLE IF NOT EXISTS observed_rings (operator TEXT PRIMARY KEY);
         """)
         # Existing decisions are append-only. Backfill once, then maintain totals
@@ -44,15 +49,16 @@ class Store:
                 "SELECT 1 FROM dashboard_totals WHERE id=1"
             ).fetchone():
                 self.db.execute("""INSERT INTO dashboard_totals
-                    SELECT 1, COUNT(*), COALESCE(SUM(CASE WHEN json_extract(decision,'$.ui_mode')='MIRAGE_HOLD'
+                    SELECT 1, COUNT(*), COALESCE(SUM(CASE WHEN json_extract(decision,'$.ui_mode') IN ('MIRAGE_HOLD','STEALTH_HOLD')
                     THEN amount ELSE 0 END),0), COALESCE(SUM(inference),0), COUNT(inference) FROM sessions""")
                 self.db.execute(
                     "INSERT OR IGNORE INTO observed_rings SELECT DISTINCT ring FROM sessions WHERE ring IS NOT NULL"
                 )
-            self.db.execute("""CREATE TRIGGER IF NOT EXISTS session_updates_dashboard AFTER INSERT ON sessions
+            self.db.execute("DROP TRIGGER IF EXISTS session_updates_dashboard")
+            self.db.execute("""CREATE TRIGGER IF NOT EXISTS session_updates_dashboard_v2 AFTER INSERT ON sessions
                 BEGIN
                     UPDATE dashboard_totals SET sessions=sessions+1,
-                        held_amount=held_amount+CASE WHEN json_extract(NEW.decision,'$.ui_mode')='MIRAGE_HOLD'
+                        held_amount=held_amount+CASE WHEN json_extract(NEW.decision,'$.ui_mode') IN ('MIRAGE_HOLD','STEALTH_HOLD')
                             THEN NEW.amount ELSE 0 END,
                         inference_sum=inference_sum+COALESCE(NEW.inference,0),
                         inference_count=inference_count+(NEW.inference IS NOT NULL) WHERE id=1;
@@ -77,11 +83,12 @@ class Store:
             return row["digest"] == digest
 
     def save(self, digest, event, decision, dossier, amount, inference, ring):
+        stealth = decision.get("ui_mode") == "STEALTH_HOLD"
         with self.db:
             self.db.execute(
                 """INSERT INTO sessions
-                (id,account,digest,event,decision,dossier,amount,inference,ring)
-                VALUES (?,?,?,?,?,?,?,?,?)""",
+                (id,account,digest,event,decision,dossier,amount,inference,ring,frozen)
+                VALUES (?,?,?,?,?,?,?,?,?,?)""",
                 (
                     event["session_id"],
                     event["account_id"],
@@ -92,8 +99,13 @@ class Store:
                     amount,
                     inference,
                     ring,
+                    int(stealth),
                 ),
             )
+
+            if stealth:
+                self.db.execute("""UPDATE guardian_push_devices SET pending=?, queued_at=unixepoch(),
+                    next_attempt=0, attempts=0 WHERE account=?""", (event["session_id"], event["account_id"]))
 
             self.db.execute(
                 "DELETE FROM pending_sessions WHERE id=?", (event["session_id"],)
@@ -182,8 +194,8 @@ class Store:
 
     def guardian_holds(self, account):
         rows = self.db.execute(
-            """SELECT id, account, amount, event, decision, frozen FROM sessions
-            WHERE account=? AND json_extract(decision,'$.ui_mode')='MIRAGE_HOLD'
+            """SELECT id, account, amount, event, decision, frozen, acknowledged FROM sessions
+            WHERE account=? AND json_extract(decision,'$.ui_mode') IN ('MIRAGE_HOLD','STEALTH_HOLD')
             ORDER BY rowid DESC LIMIT 200""",
             (account,),
         )
@@ -193,6 +205,8 @@ class Store:
                 "account_id": r["account"],
                 "amount_kzt": r["amount"],
                 "reference_code": json.loads(r["decision"])["reference_code"],
+                "urgent": json.loads(r["decision"])["ui_mode"] == "STEALTH_HOLD",
+                "acknowledged": bool(r["acknowledged"]),
                 "status": "frozen" if r["frozen"] else "held",
                 "timestamp": json.loads(r["event"])["timestamp"],
             }
@@ -203,7 +217,7 @@ class Store:
         with self.db:
             cursor = self.db.execute(
                 """UPDATE sessions SET acknowledged=1, frozen=MAX(frozen,?)
-                WHERE id=? AND account=? AND json_extract(decision,'$.ui_mode')='MIRAGE_HOLD'""",
+                WHERE id=? AND account=? AND json_extract(decision,'$.ui_mode') IN ('MIRAGE_HOLD','STEALTH_HOLD')""",
                 (int(freeze), session, account),
             )
         return cursor.rowcount == 1

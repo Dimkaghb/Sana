@@ -448,3 +448,142 @@ test("browser virtual sensors retain stationary orientation while motion continu
     (payload.imu_samples.at(-1)!.t_ms - payload.imu_samples[0].t_ms);
   expect(payload.device_meta.sample_rate_hz).toBeCloseTo(measured);
 });
+
+test("stealth receipt, analyst label and urgent Guardian action use distinct wording", async ({
+  page,
+}) => {
+  await page.goto("/mobile?mode=fixtures");
+  await page.locator(".profile select").last().selectOption("dictation");
+  await page
+    .getByRole("button", { name: "Включить защиту SANA Shield" })
+    .click();
+  for (const digit of ["1", "2", "3", "4"])
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  await page
+    .getByRole("button", { name: "Подтвердить перевод" })
+    .press("Enter");
+  await expect(
+    page.getByRole("heading", { name: "Перевод в обработке" }),
+  ).toBeVisible();
+  await expect(page.locator(".scenario-picker")).toBeHidden();
+  await expect(page.locator(".phone")).not.toContainText(
+    /заморожен|принуждение|guardian|silent duress/i,
+  );
+  await page.goto("/dashboard?mode=fixtures");
+  await page
+    .getByRole("combobox", { name: "Filter decisions" })
+    .selectOption("STEALTH_HOLD");
+  await expect(page.getByRole("row")).toHaveCount(2);
+  await expect(
+    page.getByRole("cell", { name: "Silent Duress", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Open dossier" }).click();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("heading", { name: "Why this transfer was silently frozen" }),
+  ).toBeVisible();
+  await page.goto("/guardian?mode=fixtures");
+  await expect(page.getByRole("alert")).toContainText("Call the account owner");
+  await expect(page.getByText("Transfer automatically frozen")).toBeVisible();
+});
+
+test("Guardian worker shows a privacy-preserving notification on a push event", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["notifications"]);
+  await page.goto("/guardian");
+  const cdp = await context.newCDPSession(page);
+  let registrationId = "";
+  cdp.on("ServiceWorker.workerRegistrationUpdated", ({ registrations }) => {
+    const reg = registrations.find(
+      (r) => r.scopeURL.endsWith("/guardian") && !r.isDeleted,
+    );
+    if (reg) registrationId = reg.registrationId;
+  });
+  await cdp.send("ServiceWorker.enable");
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.register("/guardian-worker.js", {
+      scope: "/guardian",
+    });
+    await navigator.serviceWorker.ready;
+  });
+  await expect.poll(() => registrationId).not.toBe("");
+  await cdp.send("ServiceWorker.deliverPushMessage", {
+    origin: new URL(page.url()).origin,
+    registrationId,
+    data: "",
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.ready;
+        return (await registration.getNotifications()).map((n) => [
+          n.title,
+          n.body,
+        ]);
+      }),
+    )
+    .toEqual([
+      [
+        "SANA Guardian",
+        "An urgent transfer needs your attention. Open Guardian.",
+      ],
+    ]);
+});
+
+test("Guardian device alerts require opt-in and can be disabled", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["notifications"]);
+  await page.addInitScript(() => {
+    const endpoint = "https://fcm.googleapis.com/fcm/send/browser-fixture";
+    let subscribed = false;
+    const sub = {
+      endpoint,
+      unsubscribe: async () => {
+        subscribed = false;
+        return true;
+      },
+    };
+    PushManager.prototype.getSubscription = async () =>
+      subscribed ? (sub as PushSubscription) : null;
+    PushManager.prototype.subscribe = async () => {
+      subscribed = true;
+      return sub as PushSubscription;
+    };
+  });
+  let enabled = false;
+  await page.routeWebSocket("**/ws/guardian", () => {});
+  await page.route("**/api/v1/guardian/holds", (r) =>
+    r.fulfill({ json: { holds: [] } }),
+  );
+  await page.route("**/api/v1/guardian/push-key", (r) =>
+    r.fulfill({ json: { public_key: "AQ" } }),
+  );
+  await page.route("**/api/v1/guardian/device/*", (r) => {
+    expect(r.request().headers().authorization).toBe("Bearer device-test");
+    expect(r.request().postDataJSON()).toEqual({
+      endpoint: "https://fcm.googleapis.com/fcm/send/browser-fixture",
+    });
+    const action = r.request().url().split("/").pop();
+    if (action === "enable") enabled = true;
+    if (action === "disable") enabled = false;
+    return r.fulfill({ json: { enabled } });
+  });
+  await page.goto("/guardian");
+  await page.getByLabel("Guardian token").fill("device-test");
+  await page.getByRole("button", { name: "Open Guardian" }).click();
+  await page.getByRole("button", { name: "Enable device alerts" }).click();
+  await expect(
+    page.getByRole("button", { name: "Disable device alerts" }),
+  ).toBeVisible();
+  expect(enabled).toBe(true);
+  await page.getByRole("button", { name: "Disable device alerts" }).click();
+  await expect(
+    page.getByRole("button", { name: "Enable device alerts" }),
+  ).toBeVisible();
+  expect(enabled).toBe(false);
+});

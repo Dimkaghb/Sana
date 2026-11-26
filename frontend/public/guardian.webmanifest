@@ -1,0 +1,16 @@
+{
+  "name": "SANA Guardian",
+  "short_name": "Guardian",
+  "start_url": "/guardian",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/shield.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

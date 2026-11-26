@@ -6,7 +6,7 @@
   "account_label": "Demo account 101",
   "decision": "MIRAGE_HOLD",
   "decision_explanation": {
-    "policy_version": "demo-1",
+    "policy_version": "demo-2",
     "reasons": [
       {
         "code": "HANDOFF_AMOUNT",

@@ -3,6 +3,7 @@ import type { DashboardEvent } from "../types";
 const headings = {
   SUCCESS: "Why this transfer was approved",
   STEP_UP_LIVENESS: "Why another check was requested",
+  STEALTH_HOLD: "Why this transfer was silently frozen",
   MIRAGE_HOLD: "Why this transfer was held",
 };
 

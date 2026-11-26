@@ -8,7 +8,7 @@ import os
 import secrets
 import time
 from collections import deque
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import asdict
 from datetime import UTC, datetime
 from weakref import WeakValueDictionary
@@ -31,6 +31,7 @@ from .calibration import save_recording
 from .coercion_engine import analyze_coercion
 from .config import Settings
 from .coordination import IdentityAccess
+from .guardian_push import GuardianPush, valid_endpoint
 from .ml_client import EnrollmentRefused, IdentityService
 from .physics_engine import analyze_tap_recoil, flag
 from .risk_fusion import decide, eligible_for_enrollment, local_hold_reasons
@@ -48,6 +49,7 @@ COLLECTION_LIMITS = {
 }
 DISPLAY = {
     "SUCCESS": ("Перевод выполнен", "Демонстрационный перевод завершён."),
+    "STEALTH_HOLD": ("Перевод в обработке", "Перевод поставлен в очередь на стандартную банковскую обработку."),
     "MIRAGE_HOLD": ("Межбанковская обработка", "Проверяем реквизиты получателя."),
     "STEP_UP_LIVENESS": ("Подтвердите перевод", "Требуется дополнительная проверка."),
 }
@@ -116,7 +118,14 @@ def create_app(settings=None, transport=None):
                 transport=transport, trust_env=False, timeout=1.5
             ) as client:
                 state.ml = IdentityService(config, client, state.checks)
-                yield
+                state.push = GuardianPush(state.store.db, client, os.getenv("SANA_PUSH_CONTACT", "mailto:guardian@example.invalid"))
+                push_task = asyncio.create_task(state.push.run())
+                try:
+                    yield
+                finally:
+                    push_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await push_task
         finally:
             state.store.db.close()
 
@@ -418,6 +427,7 @@ def create_app(settings=None, transport=None):
                     status={
                         "SUCCESS": "NORMAL",
                         "MIRAGE_HOLD": "CRITICAL",
+                        "STEALTH_HOLD": "CRITICAL",
                         "STEP_UP_LIVENESS": "WARNING",
                     }[outcome],
                 )
@@ -469,8 +479,10 @@ def create_app(settings=None, transport=None):
             )
             inference = ml["inference_ms"] if mode == "live" and ml else None
             state.store.save(digest, event, decision, dossier, amount, inference, ring)
+            if outcome == "STEALTH_HOLD":
+                state.push.wake.set()
             await notify(event)
-            if outcome == "MIRAGE_HOLD":
+            if outcome in {"MIRAGE_HOLD", "STEALTH_HOLD"}:
                 await refresh_guardian(event["account_id"])
             return decision
 
@@ -623,6 +635,28 @@ def create_app(settings=None, transport=None):
                 state.store.set_ban(operator, mode, "confirmed")
                 await notify({"type": "DASHBOARD_REFRESH"})
         return {"operator_id": operator, "status": "confirmed"}
+
+    @app.get("/api/v1/guardian/push-key")
+    async def push_key(request: Request):
+        guardian_account(bearer(request))
+        return {"public_key": app.state.push.public_key()}
+
+    @app.post("/api/v1/guardian/device/{action}")
+    async def push_device(action: str, request: Request):
+        account = guardian_account(bearer(request))
+        body = await read_json(request, 3072)
+        if not isinstance(body, dict) or set(body) != {"endpoint"} or not valid_endpoint(body["endpoint"]):
+            raise HTTPException(422, "Unsupported push subscription")
+        endpoint = body["endpoint"]
+        push = app.state.push
+        if action == "enable":
+            if not push.enable(account, endpoint):
+                raise HTTPException(409, "Device could not be registered for this account")
+        elif action == "disable":
+            push.disable(account, endpoint)
+        elif action != "status":
+            raise HTTPException(404)
+        return {"enabled": push.registered(account, endpoint)}
 
     @app.get("/api/v1/guardian/holds")
     async def holds(request: Request):

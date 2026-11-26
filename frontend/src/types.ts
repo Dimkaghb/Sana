@@ -60,6 +60,7 @@ export const money = (value: number) =>
   new Intl.NumberFormat("ru-KZ", { maximumFractionDigits: 2 }).format(value);
 export const decisionLabel = {
   SUCCESS: "Approved",
+  STEALTH_HOLD: "Silent Duress",
   MIRAGE_HOLD: "Mirage hold",
   STEP_UP_LIVENESS: "Step-up",
 };

@@ -63,7 +63,7 @@ export interface SessionTelemetry {
 }
 export interface Decision {
   session_id: string;
-  ui_mode: "MIRAGE_HOLD" | "SUCCESS" | "STEP_UP_LIVENESS";
+  ui_mode: "MIRAGE_HOLD" | "STEALTH_HOLD" | "SUCCESS" | "STEP_UP_LIVENESS";
   display_title: string;
   display_subtitle: string;
   reference_code: string;

@@ -36,3 +36,10 @@ In live mode, a new account starts with unavailable owner evidence. Have the ver
 Use separate data directories for each rehearsal. Preserve the verified seed and weights as a read-only starting point. Stop both services before copying a prepared snapshot. Select a fresh SQLite path and a fresh copy of the prepared identity store for the next run. This preserves past rehearsals and avoids copying a live database.
 
 Record device, OS/browser, measured sampling rate, missing-sensor behavior, tap coverage, detector time, end-to-end time, and each observed decision. Record real and synthetic results separately. For phone denial and ML outage, check the evidence labels and verify the phone never presents missing identity or motion as a verified success. Keep participant data, temporary recordings, tokens, private keys, databases, and builds outside version control.
+
+## Silent Duress rehearsal
+
+1. Open the authenticated analyst dashboard on the laptop and sign in to Guardian on a second device using the test account’s Guardian token. Leave Guardian visible for an offline demonstration. For optional closed-page notifications, choose **Enable device alerts** on the Guardian device and allow notifications. Web Push requires trusted HTTPS or localhost, browser support and connectivity to its push service.
+2. On the customer phone, start a simulated transfer to a new recipient. Enter three groups of three digits, for example `123`, `456`, `789`. Tap quickly within each group (gaps under 300 ms) and pause for over 900 ms between groups. Slide to confirm.
+3. The phone shows **Перевод в обработке** and a reference. On the laptop, filter **Transfer queue** to **Silent Duress** and open the dossier. Guardian displays **Urgent · Call the account owner**, the same reference and the automatic freeze. Ordinary Mirage holds still allow manual freezing.
+4. For a deterministic offline preview, open `/mobile?mode=fixtures` and select **dictation**, then inspect `/dashboard?mode=fixtures` and `/guardian?mode=fixtures`. These pages show prerecorded examples. Live transfers use the authenticated routes without the fixture query.

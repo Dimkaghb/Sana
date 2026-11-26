@@ -1,1 +1,1 @@
-{"session_id":"sess_fixture_dictation","ui_mode":"MIRAGE_HOLD","display_title":"Межбанковская обработка","display_subtitle":"Проверка реквизитов получателя (до 15 мин).","reference_code":"DEMO-DICTATION","guardian_notified":false}
+{"session_id":"sess_fixture_dictation","ui_mode":"STEALTH_HOLD","display_title":"Перевод в обработке","display_subtitle":"Перевод поставлен в очередь на стандартную банковскую обработку.","reference_code":"DEMO-42B7","guardian_notified":false}

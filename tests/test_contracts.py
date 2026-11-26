@@ -170,7 +170,7 @@ class ContractTests(unittest.TestCase):
             self.invalid("C", payload)
 
     def test_exact_mobile_modes_and_guardian_boolean(self):
-        for mode in ("SUCCESS", "MIRAGE_HOLD", "STEP_UP_LIVENESS"):
+        for mode in ("SUCCESS", "MIRAGE_HOLD", "STEALTH_HOLD", "STEP_UP_LIVENESS"):
             payload = self.payload("D")
             payload["ui_mode"] = mode
             self.assertEqual(validate_payload("D", payload, self.checks), [])

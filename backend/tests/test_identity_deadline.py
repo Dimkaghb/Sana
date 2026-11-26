@@ -78,7 +78,7 @@ class DeadlineTests(unittest.IsolatedAsyncioTestCase):
                 1,
             )
             self.assertEqual(
-                [r.json()["ui_mode"] for r in results], ["MIRAGE_HOLD"] * 3
+                [r.json()["ui_mode"] for r in results], ["MIRAGE_HOLD", "MIRAGE_HOLD", "STEALTH_HOLD"]
             )
             self.assertEqual(results[0].json(), results[1].json())
             self.assertEqual(cancelled, {"sim", "cadence"})

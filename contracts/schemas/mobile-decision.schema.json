@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:sana-shield:contract:D:1.0.0",
+  "$id": "urn:sana-shield:contract:D:1.3.0",
   "title": "MobileTransferDecision",
   "type": "object",
   "description": "Contract D: backend -> mobile UI. A simulated transfer decision in this prototype.",
@@ -15,6 +15,7 @@
       "enum": [
         "SUCCESS",
         "MIRAGE_HOLD",
+        "STEALTH_HOLD",
         "STEP_UP_LIVENESS"
       ]
     },

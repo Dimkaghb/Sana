@@ -4,6 +4,7 @@ import { Button } from "../components/ui/button";
 import { useEffect, useState } from "react";
 import { ArrowRight, LockKeyhole, ShieldCheck, Snowflake } from "lucide-react";
 import { Brand } from "../components/Brand";
+import { GuardianDeviceAlerts } from "../components/GuardianDeviceAlerts";
 import { money } from "../types";
 
 interface Hold {
@@ -13,6 +14,8 @@ interface Hold {
   reference_code: string;
   status: "held" | "frozen";
   timestamp: string;
+  urgent?: boolean;
+  acknowledged?: boolean;
 }
 export function Guardian() {
   const preview =
@@ -22,6 +25,15 @@ export function Guardian() {
   const [holds, setHolds] = useState<Hold[]>(
     preview
       ? [
+          {
+            session_id: "sess_fixture_dictation",
+            account_id: "acc_student_101",
+            reference_code: "DEMO-42B7",
+            amount_kzt: 450000,
+            urgent: true,
+            status: "frozen",
+            timestamp: "2026-11-26T14:22:01Z",
+          },
           {
             session_id: "sess_guardian_preview",
             account_id: "acc_student_101",
@@ -34,22 +46,29 @@ export function Guardian() {
       : [],
   );
   const [error, setError] = useState("");
+  const [authenticated, setAuthenticated] = useState(false);
   const [request, setRequest] = useState("");
   useEffect(() => {
     if (!token) return;
     const controller = new AbortController();
     const headers = { Authorization: "Bearer " + token };
     const acked = new Set<string>();
+    const alerted = new Set<string>();
     let latest: Hold[] = [],
       revision = 0;
     async function observe(items: Hold[]) {
       if (controller.signal.aborted || !Array.isArray(items)) return;
+      setAuthenticated(true);
       latest = items;
       setHolds(items);
       setError("");
       if (document.visibilityState !== "visible") return;
       for (const item of items) {
-        if (acked.has(item.session_id)) continue;
+        if (item.acknowledged || acked.has(item.session_id)) continue;
+        if (item.urgent && !alerted.has(item.session_id)) {
+          alerted.add(item.session_id);
+          navigator.vibrate?.([160, 80, 160]);
+        }
         acked.add(item.session_id);
         try {
           const res = await fetch(
@@ -120,7 +139,13 @@ export function Guardian() {
   }, [token]);
   async function freeze(hold: Hold) {
     if (preview) {
-      setHolds((items) => items.map((item) => ({ ...item, status: "frozen" })));
+      setHolds((items) =>
+        items.map((item) =>
+          item.session_id === hold.session_id
+            ? { ...item, status: "frozen" }
+            : item,
+        ),
+      );
       return;
     }
     setRequest(hold.session_id);
@@ -197,11 +222,14 @@ export function Guardian() {
                 onClick={() => {
                   if (preview) {
                     setHolds((items) =>
-                      items.map((item) => ({ ...item, status: "held" })),
+                      items.map((item) =>
+                        item.urgent ? item : { ...item, status: "held" },
+                      ),
                     );
                     return;
                   }
                   setHolds([]);
+                  setAuthenticated(false);
                   setToken("");
                   setError("");
                 }}
@@ -209,24 +237,43 @@ export function Guardian() {
                 {preview ? "Reset preview" : "Sign out"}
               </Button>
             </div>
+            {authenticated && !error && (
+              <GuardianDeviceAlerts key={token} token={token} />
+            )}
             {!error && !holds.length && <p>Waiting for held transfers.</p>}
             {holds.map((h) => (
               <article key={h.session_id}>
+                {h.urgent && (
+                  <div className="guardian-urgent" role="alert">
+                    <strong>Urgent · Call the account owner</strong>
+                    <p>
+                      Possible coercion during this transfer. Call the owner
+                      using a number you already know.
+                    </p>
+                  </div>
+                )}
                 <span>{h.account_id}</span>
                 <h2>{money(h.amount_kzt)} ₸</h2>
                 <p>
                   {h.reference_code} ·{" "}
                   {new Date(h.timestamp).toLocaleTimeString()}
                 </p>
-                <Button
-                  disabled={!!request || h.status === "frozen"}
-                  onClick={() => void freeze(h)}
-                >
-                  <Snowflake size={16} />
-                  {h.status === "frozen"
-                    ? "Frozen"
-                    : "Freeze simulated transfer"}
-                </Button>
+                {h.urgent ? (
+                  <p>
+                    <Snowflake size={15} aria-hidden="true" /> Transfer
+                    automatically frozen
+                  </p>
+                ) : (
+                  <Button
+                    disabled={!!request || h.status === "frozen"}
+                    onClick={() => void freeze(h)}
+                  >
+                    <Snowflake size={16} />
+                    {h.status === "frozen"
+                      ? "Frozen"
+                      : "Freeze simulated transfer"}
+                  </Button>
+                )}
               </article>
             ))}
           </>

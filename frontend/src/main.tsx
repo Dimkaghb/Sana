@@ -14,6 +14,11 @@ const Mobile = lazy(() =>
   import("./views/Mobile").then((m) => ({ default: m.Mobile })),
 );
 const route = location.pathname.replace(/\/$/, "");
+if (route === "/guardian") {
+  document
+    .querySelector('link[rel="manifest"]')
+    ?.setAttribute("href", "/guardian.webmanifest");
+}
 document.documentElement.lang = route === "/mobile" ? "ru" : "en";
 document.title =
   (

@@ -208,7 +208,12 @@ export function Dashboard({ alias }: { alias?: string }) {
   const [credentials, setCredentials] = useState(false);
 
   const events = data?.events || [];
-  const priority = { MIRAGE_HOLD: 0, STEP_UP_LIVENESS: 1, SUCCESS: 2 };
+  const priority = {
+    STEALTH_HOLD: -1,
+    MIRAGE_HOLD: 0,
+    STEP_UP_LIVENESS: 1,
+    SUCCESS: 2,
+  };
   const visible = events
     .filter(
       (e) =>

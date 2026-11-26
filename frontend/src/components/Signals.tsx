@@ -132,6 +132,7 @@ export function ActivityChart({ events }: { events: DashboardEvent[] }) {
       ["SUCCESS", "Approved"],
       ["STEP_UP_LIVENESS", "Step-up"],
       ["MIRAGE_HOLD", "Mirage hold"],
+      ["STEALTH_HOLD", "Silent Duress"],
     ] as const;
     return (
       <Card className="activity-chart">
@@ -168,6 +169,7 @@ export function ActivityChart({ events }: { events: DashboardEvent[] }) {
   const start = final + 1 - span * 32;
   const buckets = Array.from({ length: 32 }, () => ({
     SUCCESS: 0,
+    STEALTH_HOLD: 0,
     MIRAGE_HOLD: 0,
     STEP_UP_LIVENESS: 0,
   }));
@@ -175,7 +177,9 @@ export function ActivityChart({ events }: { events: DashboardEvent[] }) {
     buckets[Math.floor((times[i] - start) / span)][e.decision]++;
   });
   const peak = Math.max(
-    ...buckets.map((b) => b.SUCCESS + b.MIRAGE_HOLD + b.STEP_UP_LIVENESS),
+    ...buckets.map(
+      (b) => b.SUCCESS + b.MIRAGE_HOLD + b.STEALTH_HOLD + b.STEP_UP_LIVENESS,
+    ),
   );
   const format = (ms: number) => new Date(ms).toLocaleTimeString("en-GB");
   return (
@@ -201,19 +205,27 @@ export function ActivityChart({ events }: { events: DashboardEvent[] }) {
             title={
               format(start + i * span) +
               " · " +
-              (b.SUCCESS + b.MIRAGE_HOLD + b.STEP_UP_LIVENESS) +
+              (b.SUCCESS +
+                b.MIRAGE_HOLD +
+                b.STEALTH_HOLD +
+                b.STEP_UP_LIVENESS) +
               " transfers"
             }
           >
-            {(["SUCCESS", "STEP_UP_LIVENESS", "MIRAGE_HOLD"] as const).map(
-              (k) => (
-                <i
-                  key={k}
-                  className={k}
-                  style={{ height: (b[k] / peak) * 100 + "%" }}
-                />
-              ),
-            )}
+            {(
+              [
+                "SUCCESS",
+                "STEP_UP_LIVENESS",
+                "MIRAGE_HOLD",
+                "STEALTH_HOLD",
+              ] as const
+            ).map((k) => (
+              <i
+                key={k}
+                className={k}
+                style={{ height: (b[k] / peak) * 100 + "%" }}
+              />
+            ))}
           </div>
         ))}
       </div>
@@ -223,7 +235,7 @@ export function ActivityChart({ events }: { events: DashboardEvent[] }) {
           <i />
           Approved <i />
           Step-up <i />
-          Mirage hold
+          Mirage hold <i /> Silent Duress
         </span>
         <span>{format(final)}</span>
       </footer>

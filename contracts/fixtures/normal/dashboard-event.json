@@ -6,7 +6,7 @@
   "account_label": "Demo account 101",
   "decision": "SUCCESS",
   "decision_explanation": {
-    "policy_version": "demo-1",
+    "policy_version": "demo-2",
     "reasons": [
       {
         "code": "BELOW_REVIEW_THRESHOLD",

@@ -54,7 +54,7 @@ class RuntimeTests(unittest.TestCase):
             for scenario, outcome in [
                 ("normal", "SUCCESS"),
                 ("synthetic_touch", "MIRAGE_HOLD"),
-                ("dictation", "MIRAGE_HOLD"),
+                ("dictation", "STEALTH_HOLD"),
                 ("handoff", "MIRAGE_HOLD"),
                 ("ring", "MIRAGE_HOLD"),
                 ("banned_operator", "MIRAGE_HOLD"),
@@ -71,7 +71,7 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(c.get(INIT).json()["events"][0], event)
                 basis = event["decision_explanation"]
                 codes = [item["code"] for item in basis["reasons"]]
-                self.assertEqual(basis["policy_version"], "demo-1")
+                self.assertEqual(basis["policy_version"], "demo-2")
                 self.assertIn({
                     "normal": "BELOW_REVIEW_THRESHOLD", "synthetic_touch": "TOUCH_HOLD",
                     "dictation": "COERCION_NEW_RECIPIENT", "handoff": "HANDOFF_AMOUNT",
@@ -93,6 +93,33 @@ class RuntimeTests(unittest.TestCase):
             payload["duration_ms"] += 1
             self.assertEqual(c.post(INGEST, json=payload).status_code, 409)
             self.assertEqual(c.get(INIT).json()["kpis"]["sessions"], 7)
+
+    def test_silent_duress_freezes_before_delivery_and_survives_restart(self):
+        payload = fixture("dictation")
+        sid = payload["session_id"]
+        other = {"Authorization": "Bearer second"}
+        with self.client() as c, c.websocket_connect("/ws/guardian", headers=ORIGIN) as ws:
+            ws.send_json({"token": "test-guardian"})
+            self.assertEqual(ws.receive_json()["holds"], [])
+            receipt = c.post(INGEST, json=payload).json()
+            self.assertEqual(receipt["ui_mode"], "STEALTH_HOLD")
+            self.assertEqual(receipt["display_title"], "Перевод в обработке")
+            item, = ws.receive_json()["holds"]
+            self.assertTrue(item["urgent"])
+            self.assertFalse(item["acknowledged"])
+            self.assertEqual((item["status"], item["reference_code"]), ("frozen", receipt["reference_code"]))
+            self.assertEqual(c.get("/api/v1/guardian/holds", headers=other).json()["holds"], [])
+            action = f"/api/v1/guardian/holds/{sid}/ack"
+            self.assertEqual(c.post(action, headers=other).status_code, 404)
+            self.assertEqual(c.post(action, headers=GUARDIAN).status_code, 200)
+        with self.client() as c:
+            self.assertEqual(c.post(INGEST, json=payload).json(), receipt)
+            item, = c.get("/api/v1/guardian/holds", headers=GUARDIAN).json()["holds"]
+            self.assertEqual((item["status"], item["acknowledged"]), ("frozen", True))
+            data = c.get(INIT).json()
+            self.assertEqual(data["kpis"]["held_amount_kzt"], payload["transfer_context"]["amount_kzt"])
+            self.assertEqual(data["kpis"]["sessions"], 1)
+            self.assertEqual(data["events"][0]["decision"], "STEALTH_HOLD")
 
     def test_restart_recovers_an_interrupted_reservation(self):
         payload = fixture("normal")
@@ -417,7 +444,8 @@ class SignalTests(unittest.TestCase):
         ml = fixture("ring", "ml-score")
         ml["operator_reconciliation"]["is_banned_operator"] = True
         policy = Policy(version="custom", hold_threshold=79, ring_confidence=0.9)
-        *_, basis = decide(payload, Evidence(None), Evidence(80), ml, policy)
+        outcome, *_, basis = decide(payload, Evidence(None), Evidence(80), ml, policy)
+        self.assertEqual(outcome, "STEALTH_HOLD")
         self.assertEqual(basis["policy_version"], "custom")
         self.assertEqual([r["code"] for r in basis["reasons"]],
                          ["BANNED_OPERATOR", "CROSS_ACCOUNT_MATCH", "COERCION_NEW_RECIPIENT"])
@@ -441,7 +469,7 @@ class SignalTests(unittest.TestCase):
         self.assertEqual(outcome(75), "MIRAGE_HOLD")
         payload["transfer_context"]["is_new_recipient"] = True
         self.assertEqual(outcome(coercion=74), "STEP_UP_LIVENESS")
-        self.assertEqual(outcome(coercion=75), "MIRAGE_HOLD")
+        self.assertEqual(outcome(coercion=75), "STEALTH_HOLD")
         payload["transfer_context"]["is_new_recipient"] = False
         self.assertEqual(outcome(coercion=75), "STEP_UP_LIVENESS")
         ml["owner_verification"]["is_handoff_detected"] = True

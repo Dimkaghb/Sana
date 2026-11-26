@@ -412,6 +412,7 @@ td:last-child {
   color: var(--success);
   font-size: 10px;
 }
+.badge.STEALTH_HOLD,
 .badge.MIRAGE_HOLD {
   background: #fae9e7;
   color: var(--critical);
@@ -795,6 +796,7 @@ dialog input,
   border-radius: 17px;
   margin: 6px 0 20px;
 }
+.receipt.STEALTH_HOLD .receipt-icon,
 .receipt.MIRAGE_HOLD .receipt-icon {
   background: #dfeaf3;
   color: #447498;
@@ -1466,6 +1468,7 @@ body {
 }
 .badge.SUCCESS,
 .badge.MIRAGE_HOLD,
+.badge.STEALTH_HOLD,
 .badge.STEP_UP_LIVENESS {
   background: color-mix(in srgb, currentColor 10%, var(--panel));
   border: 0;
@@ -1912,3 +1915,18 @@ body {
 .decision-explanation strong { font-size: 13px; }
 .decision-explanation p { margin: 3px 0; font-size: 13px; line-height: 1.5; }
 .decision-explanation small { font-size: 11px; color: var(--muted); }
+
+.bars i.STEALTH_HOLD, .chart-key i:nth-child(4), .decision-strip .STEALTH_HOLD {
+  background: #ae72b1;
+}
+.guardian .guardian-urgent {
+  padding: 12px;
+  margin-bottom: 10px;
+  border-inline-start: 3px solid var(--critical);
+  background: var(--tint);
+}
+.guardian-urgent strong { display: block; }
+
+.guardian-device { margin-block: 12px; }
+.guardian-device small { display: block; color: var(--muted); margin: 4px 0; }
+.phone:has(.receipt) .scenario-picker { display: none; }

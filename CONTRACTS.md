@@ -1,6 +1,6 @@
 # Shared data contracts
 
-**Contract C version 1.2.0. Contracts A, B and D version 1.1.0.** Source: PRD section 3 (pages 2-4), with Person Two behavior on pages 6-7. Field names and nesting are preserved. Schemas preserve the PRD example shapes and document the runtime extensions below.
+**Contracts C and D version 1.3.0. Contracts A and B retain their existing schemas.** Source: PRD section 3 (pages 2-4), with Person Two behavior on pages 6-7. Field names and nesting are preserved. Schemas preserve the PRD example shapes and document the runtime extensions below.
 
 Do not silently alter fields. Update schemas, this document, affected fixtures, and consumers together. Sample values are examples, not fixed constants unless explicitly stated (128 dimensions, event type, and decision modes).
 
@@ -59,7 +59,7 @@ The sample-rate zero sentinel, precise offset normalization, fractional timestam
 
 - `type` is `SESSION_SCORED`; `timestamp` is a UTC RFC 3339 timestamp ending in `Z`.
 - `session_id` and `account_id` match A. Available risk scores are in [0,100]. Each component and the overall score accept null. With no B, map_point is null.
-- `decision` uses the same three outcomes as D. Both outputs represent the same persisted decision.
+- `decision` uses the same four outcomes as D. Both outputs represent the same persisted decision.
 - `account_label` is a fictional demo display label or approved account alias; the telemetry SDK does not collect names.
 - Flag entries contain `code`, `severity`, `title`, and `detail`. The PRD establishes `ZERO_RECOIL_RAT`, `ACCOUNT_HANDOFF`, `DROPPER_RING_MATCH`, `DICTATION_COERCION`, and `HAND_TREMOR`. Fixtures additionally use `BANNED_OPERATOR`; this is an additive example code, not a closed enum change.
 - Severity/status strings remain open because the PRD does not define complete enums. Fixtures use `CRITICAL` severity and `NORMAL`/`CRITICAL` map statuses.
@@ -70,7 +70,7 @@ C is a completed-session event, not the streaming protocol for a continuously up
 
 ## D - Mobile outcome
 
-Allowed `ui_mode`: `SUCCESS`, `MIRAGE_HOLD`, `STEP_UP_LIVENESS`. Display strings and reference code are backend-provided. The reference identifies a simulated transfer in the prototype.
+Allowed `ui_mode`: `SUCCESS`, `MIRAGE_HOLD`, `STEALTH_HOLD`, `STEP_UP_LIVENESS`. Display strings and reference code are backend-provided. The reference identifies a simulated transfer in the prototype.
 
 `guardian_notified` is false until a real notification has been delivered. The PRD's true example is not a requirement to claim delivery before implementing Guardian support.
 
@@ -114,4 +114,12 @@ The ML population endpoints and dashboard initialization add an optional `positi
 
 ### Analyst decision explanation
 
-Contract C 1.2 adds optional `decision_explanation` to the completed event. New decisions record the policy version and an ordered list of the rules that determined the outcome. Each rule has a stable code, short title and plain-English detail. Multiple qualifying holds are retained. A missing-evidence step-up is recorded only when no hold rule applies. Flags continue to describe observations independently. Mock identity remains labeled by the event’s `MOCK_IDENTITY` flag. The saved event supplies the WebSocket, dashboard recovery and dossier export. Existing events can omit the field. Upgrade strict Contract C validators before enabling a 1.2 producer. Mobile and Guardian responses keep their existing shapes.
+Contract C 1.2 adds optional `decision_explanation` to the completed event. New decisions record the policy version and an ordered list of the rules that determined the outcome. Each rule has a stable code, short title and plain-English detail. Multiple qualifying holds are retained. A missing-evidence step-up is recorded only when no hold rule applies. Flags continue to describe observations independently. Mock identity remains labeled by the event’s `MOCK_IDENTITY` flag. The saved event supplies the WebSocket, dashboard recovery and dossier export. Existing events can omit the field. Upgrade strict Contract C validators before enabling a 1.2 producer. In version 1.2 this extension affected only the analyst event.
+
+### Silent Duress
+
+Contracts C and D version 1.3 extend the original PRD with a fourth outcome, `STEALTH_HOLD`. A coercion score at or above the configured hold threshold and a new recipient activate it. If another hold rule also qualifies, the decision is stealth and the recorded explanation retains all qualifying reasons. Other hold rules still select `MIRAGE_HOLD`. The default policy version is `demo-2`. Strict enum consumers, including the mobile SDK, must upgrade with the backend. Historical decisions and receipts keep their original meanings.
+
+The backend saves the stealth receipt, frozen simulated transfer and pending device notifications in one SQLite transaction. Both hold types count toward held KZT. Mobile displays neutral processing text and a reference. The analyst sees Silent Duress. A scoped Guardian hold includes `urgent` and `acknowledged` booleans. Stealth holds are immediately frozen. Other holds retain the manual freeze action. Acknowledgement records display in an authenticated, visible Guardian view. Neither push-provider acceptance nor a browser notification alone acknowledges the case.
+
+A Guardian can opt in to Web Push for their own device. The service worker receives a payload-free notification and opens the authenticated Guardian page. The server coalesces pending notifications per device and retries temporary failures for up to an hour. The held transfer remains in account history. Supply the operator contact with `SANA_PUSH_CONTACT` (a mailto URL) when using a real push service. The VAPID signing key and device endpoints are private local database records. Signing out closes the private view. Device notifications remain enabled until the Guardian disables them or revokes browser permission.

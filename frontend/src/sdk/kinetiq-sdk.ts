@@ -430,7 +430,9 @@ export class KinetiqSDK {
     const data: Decision = await response.json();
     if (
       data.session_id !== this.sessionId ||
-      !["SUCCESS", "STEP_UP_LIVENESS", "MIRAGE_HOLD"].includes(data.ui_mode) ||
+      !["SUCCESS", "STEP_UP_LIVENESS", "MIRAGE_HOLD", "STEALTH_HOLD"].includes(
+        data.ui_mode,
+      ) ||
       typeof data.display_title !== "string" ||
       typeof data.display_subtitle !== "string" ||
       typeof data.reference_code !== "string" ||

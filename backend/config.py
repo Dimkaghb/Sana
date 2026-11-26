@@ -9,7 +9,7 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class Policy:
-    version: str = "demo-1"
+    version: str = "demo-2"
     recoil_floor: float = 0.08
     hold_threshold: int = 75
     step_up_threshold: int = 50
@@ -55,7 +55,7 @@ class Settings:
         if not math.isfinite(recoil) or recoil <= 0:
             raise ValueError("SANA_RECOIL_FLOOR must be finite and positive")
         policy = Policy(
-            version=os.getenv("SANA_POLICY_VERSION", "demo-1"),
+            version=os.getenv("SANA_POLICY_VERSION", "demo-2"),
             recoil_floor=recoil,
             hold_threshold=int(os.getenv("SANA_HOLD_THRESHOLD", "75")),
             step_up_threshold=int(os.getenv("SANA_STEP_UP_THRESHOLD", "50")),

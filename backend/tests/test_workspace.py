@@ -96,7 +96,7 @@ class WorkspaceTests(unittest.TestCase):
             store = Store(path)
             # Represent the previous schema, before summary tables existed.
             store.db.executescript(
-                "DROP TRIGGER session_updates_dashboard; DROP TABLE dashboard_totals; DROP TABLE observed_rings;"
+                "DROP TRIGGER session_updates_dashboard_v2; DROP TABLE dashboard_totals; DROP TABLE observed_rings;"
             )
             decision = {"ui_mode": "MIRAGE_HOLD"}
             event = {"session_id": "old", "account_id": "alias", "map_point": None}
@@ -107,7 +107,7 @@ class WorkspaceTests(unittest.TestCase):
             store.save(
                 "digest2",
                 {**event, "session_id": "new"},
-                decision,
+                {"ui_mode": "STEALTH_HOLD"},
                 {},
                 30,
                 17.5,

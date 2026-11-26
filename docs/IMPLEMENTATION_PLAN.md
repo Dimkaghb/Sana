@@ -151,3 +151,11 @@ Verified all three steps locally. All seven scenario decisions passed the HTTP a
 On this laptop, the seven mock-identity requests took 3.3–16.5 ms each. The synthetic evaluation used 18 enrolled and 18 query sessions. Feature extraction plus encoder inference took about 1 ms at p95. Both eligible cross-account queries ranked the expected operator first. Participant accuracy and end-to-end latency on physical phones remain open.
 
 For a repeatable demonstration, open the fixture dashboard, select the transfer labeled “Possible coaching on a transfer to a new recipient,” and open its dossier. The synthetic decision cites repeated digit bursts, a new recipient and a score of 82 against the hold threshold of 75.
+
+## Silent Duress
+
+Implemented the dedicated coercion outcome across risk fusion, Contracts C/D, SQLite, mobile receipt and history, analyst queue and dossier, and the account-scoped Guardian. A qualifying new-recipient coercion hold takes precedence when other hold reasons also match. The automatic freeze and pending device alerts commit together before the backend broadcasts the event.
+
+Verified one simulated ₸50,000 transfer on the local live model using three independent Chromium sessions. The customer entered three rapid digit groups with pauses. The customer receipt and history displayed neutral processing text, the analyst saw Silent Duress and both matching rules, and the Guardian saw the same reference already frozen. The dossier recorded the Guardian acknowledgement.
+
+The production build, four schemas, 27 fixtures, seven HTTP/WebSocket scenarios, isolated live-model rehearsal and 62 automated tests passed. Tests cover opt-in and opt-out, a browser service-worker notification, a signed payload-free request to a simulated push service, transient failure/restart recovery, expired subscriptions, account isolation, hold totals and retry idempotency. Actual provider delivery on a physical phone and participant calibration remain unverified.

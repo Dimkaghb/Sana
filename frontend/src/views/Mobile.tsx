@@ -10,6 +10,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Check,
+  Clock3,
   ChevronsRight,
   CreditCard,
   Delete,
@@ -86,7 +87,7 @@ export function Mobile({ alias }: { alias?: string }) {
         </div>
         {logoutError && <p role="alert">Не удалось выйти.</p>}
         {preview && (
-          <Label className="profile">
+          <Label className="profile scenario-picker">
             <span>Демо-сценарий</span>
             <NativeSelect
               value={scenario}
@@ -239,6 +240,8 @@ function Transfer({
         <div className="receipt-icon">
           {result.ui_mode === "SUCCESS" ? (
             <Check />
+          ) : result.ui_mode === "STEALTH_HOLD" ? (
+            <Clock3 aria-hidden="true" />
           ) : result.ui_mode === "MIRAGE_HOLD" ? (
             <LockKeyhole />
           ) : (
