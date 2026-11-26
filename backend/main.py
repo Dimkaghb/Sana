@@ -220,6 +220,10 @@ def create_app(settings=None, transport=None):
                         409, "Session ID reused with different telemetry"
                     )
                 return json.loads(row["decision"])
+            if not state.store.reserve(session, digest):
+                raise HTTPException(
+                    409, "Pending session ID reused with different telemetry"
+                )
             policy = state.config.policy
             start = time.perf_counter()
             recoil = analyze_tap_recoil(telemetry, policy)

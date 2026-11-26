@@ -13,6 +13,7 @@ class Store:
         self.db.row_factory = sqlite3.Row
         self.db.executescript("""
             PRAGMA journal_mode=WAL;
+            CREATE TABLE IF NOT EXISTS pending_sessions (id TEXT PRIMARY KEY, digest TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY, account TEXT NOT NULL, digest TEXT NOT NULL,
                 event TEXT NOT NULL, decision TEXT NOT NULL, dossier TEXT NOT NULL,
@@ -31,6 +32,18 @@ class Store:
             "SELECT * FROM sessions WHERE id=?", (session_id,)
         ).fetchone()
 
+    def reserve(self, session, digest):
+        # Bind an ID before contacting ML. An interrupted request can resume only
+        # with its original input even if ML already processed the first attempt.
+        with self.db:
+            self.db.execute(
+                "INSERT OR IGNORE INTO pending_sessions VALUES (?,?)", (session, digest)
+            )
+            row = self.db.execute(
+                "SELECT digest FROM pending_sessions WHERE id=?", (session,)
+            ).fetchone()
+            return row["digest"] == digest
+
     def save(self, digest, event, decision, dossier, amount, inference, ring):
         with self.db:
             self.db.execute(
@@ -48,6 +61,10 @@ class Store:
                     inference,
                     ring,
                 ),
+            )
+
+            self.db.execute(
+                "DELETE FROM pending_sessions WHERE id=?", (event["session_id"],)
             )
 
     def cache_fingerprint(self, session, value):

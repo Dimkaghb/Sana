@@ -1,3 +1,4 @@
+import hashlib
 import json
 import tempfile
 import unittest
@@ -14,6 +15,7 @@ from backend.config import Policy, Settings
 from backend.main import create_app
 from backend.physics_engine import Evidence, analyze_tap_recoil
 from backend.risk_fusion import decide
+from backend.storage import Store
 from scripts.validate_contracts import FIXTURES, load_json, validate_payload, validators
 
 INGEST = "/api/v1/sessions/ingest"
@@ -77,6 +79,23 @@ class RuntimeTests(unittest.TestCase):
             payload["duration_ms"] += 1
             self.assertEqual(c.post(INGEST, json=payload).status_code, 409)
             self.assertEqual(c.get(INIT).json()["kpis"]["sessions"], 7)
+
+    def test_restart_recovers_an_interrupted_reservation(self):
+        payload = fixture("normal")
+        digest = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        store = Store(self.db)
+        try:
+            self.assertTrue(store.reserve(payload["session_id"], digest))
+        finally:
+            store.db.close()
+        with self.client() as c:
+            changed = {**payload, "duration_ms": payload["duration_ms"] + 1}
+            self.assertEqual(c.post(INGEST, json=changed).status_code, 409)
+            self.assertEqual(c.get(INIT).json()["kpis"]["sessions"], 0)
+            self.assertEqual(c.post(INGEST, json=payload).json()["ui_mode"], "SUCCESS")
+            self.assertEqual(c.get(INIT).json()["kpis"]["sessions"], 1)
 
     def test_malformed_bounds_and_privacy(self):
         with self.client() as c:
