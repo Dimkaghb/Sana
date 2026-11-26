@@ -43,3 +43,7 @@ Record device, OS/browser, measured sampling rate, missing-sensor behavior, tap 
 2. On the customer phone, start a simulated transfer to a new recipient. Enter three groups of three digits, for example `123`, `456`, `789`. Tap quickly within each group (gaps under 300 ms) and pause for over 900 ms between groups. Slide to confirm.
 3. The phone shows **Перевод в обработке** and a reference. On the laptop, filter **Transfer queue** to **Silent Duress** and open the dossier. Guardian displays **Urgent · Call the account owner**, the same reference and the automatic freeze. Ordinary Mirage holds still allow manual freezing.
 4. For a deterministic offline preview, open `/mobile?mode=fixtures` and select **dictation**, then inspect `/dashboard?mode=fixtures` and `/guardian?mode=fixtures`. These pages show prerecorded examples. Live transfers use the authenticated routes without the fixture query.
+
+## Linked account freeze rehearsal
+
+Open the authenticated analyst dashboard after the identity service records a qualifying cross-account match. The **Suspected mule rings** panel shows the operator, linked accounts, cosine match, and simulated held amount. Select **Freeze Linked Accounts**, check the account list, and confirm. The counter then counts the frozen ring transfers, including subsequent attempts from accounts in review. The fixture dashboard includes a read-only example. To exercise the full action on isolated data, run `backend/.venv/bin/python -m scripts.check_live` from the repository root.

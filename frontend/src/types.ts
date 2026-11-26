@@ -31,6 +31,7 @@ export interface DashboardData {
   events: DashboardEvent[];
   ml_mode: "mock" | "live";
   active_sessions: string[];
+  rings?: FraudRing[];
   session_identity?: Record<
     string,
     {
@@ -55,6 +56,15 @@ export interface DashboardData {
     ring_count: number;
     average_inference_ms: number | null;
   };
+}
+export interface FraudRing {
+  operator_id: string;
+  evidence_session_id: string;
+  cluster_id: number | null;
+  match_confidence: number;
+  accounts: { account_id: string; in_review: boolean }[];
+  exposure_kzt: number;
+  protected_kzt: number;
 }
 export const money = (value: number) =>
   new Intl.NumberFormat("ru-KZ", { maximumFractionDigits: 2 }).format(value);

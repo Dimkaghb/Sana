@@ -193,6 +193,14 @@ export function PopulationMap({
     setFilter(next);
   }
   const synthetic = sessions.filter((session) => session.synthetic).length;
+  const ringEvidence = new Set(
+    data?.rings?.map((ring) => ring.evidence_session_id),
+  );
+  const ringGroups = new Set(
+    sessions
+      .filter((session) => ringEvidence.has(session.id))
+      .map((session) => session.cluster_id),
+  );
 
   const header = (large: boolean) => (
     <header className="population-header">
@@ -323,6 +331,16 @@ export function PopulationMap({
                   ? "Choose a group to see its sessions."
                   : "Sessions appear here when they have a map position."}
             </p>
+            {group !== undefined && group >= 0 && ringGroups.has(group) && (
+              <a
+                className="population-back"
+                href="#suspected-mule-rings"
+                onClick={() => setExpanded(false)}
+              >
+                Suspected mule ring{" "}
+                <ArrowUpRight size={14} aria-hidden="true" />
+              </a>
+            )}
           </div>
           {detail ? (
             <ul className="population-list">
@@ -366,6 +384,9 @@ export function PopulationMap({
                     <span>
                       <strong>{groupLabel(group)}</strong>
                       <small>{sessionCount(members.length)}</small>
+                      {group >= 0 && ringGroups.has(group) && (
+                        <small aria-hidden="true">Suspected mule ring</small>
+                      )}
                     </span>
                     <ChevronRight size={16} aria-hidden="true" />
                   </button>

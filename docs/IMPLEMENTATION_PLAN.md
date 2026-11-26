@@ -161,3 +161,9 @@ Implemented the dedicated coercion outcome across risk fusion, Contracts C/D, SQ
 Verified one simulated ₸50,000 transfer on the local live model using three independent Chromium sessions. The customer entered three rapid digit groups with pauses. The customer receipt and history displayed neutral processing text, the analyst saw Silent Duress and both matching rules, and the Guardian saw the same reference already frozen. The dossier recorded the Guardian acknowledgement.
 
 The production build, four schemas, 27 fixtures, seven HTTP/WebSocket scenarios, isolated live-model rehearsal and 62 automated tests passed. Tests cover opt-in and opt-out, a browser service-worker notification, a signed payload-free request to a simulated push service, transient failure/restart recovery, expired subscriptions, account isolation, hold totals and retry idempotency. Actual provider delivery on a physical phone and participant calibration remain unverified.
+
+## Linked account review
+
+The analyst queue and population map connect suspected mule rings to persisted cross-account cosine matches. The detail card shows the linked accounts and the simulated KZT exposure and protected value. After confirmation, the backend bans the operator, freezes existing held transfers attributed to the confirmed ring and places subsequent transfers from the linked accounts in review.
+
+Verified the workflow against the isolated live identity service. The check established the owner baseline, identified the cross-account match, froze the linked accounts, held a subsequent transfer and counted the frozen KZT. The browser test verified that cancel leaves the ring unchanged and confirmation refreshes the counter. Backend tests cover persistence after restart, retry accounting, permission and evidence checks, and identity-service failure.

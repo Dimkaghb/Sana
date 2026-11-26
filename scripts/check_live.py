@@ -40,16 +40,26 @@ async def exercise(directory, identity_url, token):
         dashboard = (await bank.get("/api/v1/dashboard/init")).json()
         ring = next(e for e in dashboard["events"] if e["session_id"] == "check_ring")
         assert any(f["code"] == "DROPPER_RING_MATCH" for f in ring["flags"])
-        operator = ring["map_point"]["operator_id"]
-        result = await bank.post(f"/api/v1/operators/{operator}/ban",
-                                 headers={"Authorization": f"Bearer {analyst}"})
+        evidence, = dashboard["rings"]
+        assert evidence["evidence_session_id"] == "check_ring"
+        assert {item["account_id"] for item in evidence["accounts"]} == {
+            "acc_example_owner", "acc_example_other"
+        }
+        assert evidence["protected_kzt"] == 0
+        result = await bank.post("/api/v1/rings/check_ring/freeze",
+                                 headers={"Authorization": f"Bearer {analyst}"},
+                                 json={"confirmed": True})
         result.raise_for_status()
+        assert (await submit("check_review", "acc_example_owner"))["ui_mode"] == "MIRAGE_HOLD"
+        dashboard = (await bank.get("/api/v1/dashboard/init", params={"include_map": False})).json()
+        assert dashboard["events"][0]["decision_explanation"]["reasons"][0]["code"] == "RING_ACCOUNT_REVIEW"
+        assert dashboard["rings"][0]["protected_kzt"] == 2 * payload["transfer_context"]["amount_kzt"]
         await submit("check_reentry", "acc_example_new")
         events = (await bank.get("/api/v1/dashboard/init")).json()["events"]
         reentry = next(e for e in events if e["session_id"] == "check_reentry")
         assert any(f["code"] == "BANNED_OPERATOR" for f in reentry["flags"])
         assert reentry["decision"] == "MIRAGE_HOLD"
-        print("Verified live HTTP scoring, three supervised enrollments, owner success, ring, ban and re-entry.")
+        print("Verified live scoring, three enrollments, owner success, ring freeze, protected KZT, and banned-operator re-entry.")
 
 
 async def main(interpreter, model):

@@ -46,6 +46,68 @@ class RuntimeTests(unittest.TestCase):
     def client(self):
         return TestClient(create_app(self.settings))
 
+    def test_confirmed_ring_freeze_persists_and_holds_new_transfers(self):
+        recorded = fixture("ring")
+        endpoint = f"/api/v1/rings/{recorded['session_id']}/freeze"
+        with self.client() as c:
+            original = c.post(INGEST, json=recorded).json()
+            ring, = c.get(INIT).json()["rings"]
+            amount = recorded["transfer_context"]["amount_kzt"]
+            self.assertEqual((ring["cluster_id"], len(ring["accounts"])), (1, 3))
+            self.assertEqual((ring["exposure_kzt"], ring["protected_kzt"]), (amount, 0))
+            self.assertEqual(c.post(endpoint, json={"confirmed": True}).status_code, 403)
+            self.assertEqual(c.post(endpoint, json={"confirmed": 1}, headers=ADMIN).status_code, 422)
+            self.assertEqual(c.get("/api/v1/guardian/holds", headers=GUARDIAN).json()["holds"][0]["status"], "held")
+            for _ in range(2):
+                self.assertEqual(c.post(endpoint, json={"confirmed": True}, headers=ADMIN).status_code, 200)
+            self.assertEqual(c.get("/api/v1/guardian/holds", headers=GUARDIAN).json()["holds"][0]["status"], "frozen")
+            self.assertEqual(c.post(INGEST, json=recorded).json(), original)
+
+        with self.client() as c:
+            for entry in ring["accounts"]:
+                alias = entry["account_id"]
+                payload = fixture("normal")
+                payload.update(session_id=f"review-{alias}", account_id=alias)
+                receipt = c.post(INGEST, json=payload).json()
+                self.assertEqual(receipt["ui_mode"], "MIRAGE_HOLD")
+                event = c.get(INIT).json()["events"][0]
+                self.assertEqual(event["decision_explanation"]["reasons"][0]["code"], "RING_ACCOUNT_REVIEW")
+                self.assertEqual(c.post(INGEST, json=payload).json(), receipt)
+            unrelated = fixture("normal")
+            unrelated.update(session_id="unrelated", account_id="other")
+            self.assertEqual(c.post(INGEST, json=unrelated).json()["ui_mode"], "SUCCESS")
+            updated, = c.get(INIT).json()["rings"]
+            expected = amount + 3 * unrelated["transfer_context"]["amount_kzt"]
+            self.assertEqual((updated["exposure_kzt"], updated["protected_kzt"]), (expected, expected))
+            self.assertTrue(all(account["in_review"] for account in updated["accounts"]))
+        store = Store(self.db)
+        self.addCleanup(store.db.close)
+        self.assertEqual(store.ban_status(ring["operator_id"], "mock"), "confirmed")
+        self.assertIsNone(store.account_review(recorded["account_id"], "live"))
+
+    def test_stale_evidence_and_failed_identity_ban_do_not_activate_review(self):
+        def ml(request):
+            if request.url.path.endswith("/ban"):
+                return httpx.Response(503)
+            payload = json.loads(request.content)
+            result = fixture("ring", "ml-score")
+            result["session_id"] = payload["session_id"]
+            return httpx.Response(200, json=result)
+
+        settings = Settings("live", self.db, fixture_access=True, admin_token="test-analyst")
+        with TestClient(create_app(settings, httpx.MockTransport(ml))) as c:
+            payload = fixture("ring")
+            for session in ("ring-old", "ring-new"):
+                payload["session_id"] = session
+                self.assertEqual(c.post(INGEST, json=payload).status_code, 200)
+            for session, status in (("ring-old", 409), ("ring-new", 502)):
+                self.assertEqual(c.post(
+                    f"/api/v1/rings/{session}/freeze", headers=ADMIN, json={"confirmed": True}
+                ).status_code, status)
+            ring, = c.get(INIT, params={"include_map": False}).json()["rings"]
+            self.assertFalse(any(account["in_review"] for account in ring["accounts"]))
+            self.assertEqual(ring["protected_kzt"], 0)
+
     def test_fixture_flow_and_retry_after_restart(self):
         with (
             self.client() as c,
@@ -71,7 +133,7 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(c.get(INIT).json()["events"][0], event)
                 basis = event["decision_explanation"]
                 codes = [item["code"] for item in basis["reasons"]]
-                self.assertEqual(basis["policy_version"], "demo-2")
+                self.assertEqual(basis["policy_version"], "demo-3")
                 self.assertIn({
                     "normal": "BELOW_REVIEW_THRESHOLD", "synthetic_touch": "TOUCH_HOLD",
                     "dictation": "COERCION_NEW_RECIPIENT", "handoff": "HANDOFF_AMOUNT",

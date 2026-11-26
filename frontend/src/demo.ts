@@ -1,4 +1,6 @@
 import fixturePositions from "./fixture-positions.json";
+import ringEvidence from "../../contracts/fixtures/ring/ml-score.json";
+import ringTelemetry from "../../contracts/fixtures/ring/telemetry.json";
 import type { Decision } from "./sdk";
 import type { DashboardData, DashboardEvent } from "./types";
 const files = import.meta.glob<DashboardEvent>(
@@ -12,6 +14,19 @@ export const fixtureData: DashboardData = {
   events: fixtureEvents,
   ml_mode: "mock",
   active_sessions: [],
+  rings: [
+    {
+      operator_id: ringEvidence.operator_reconciliation.matched_operator_id,
+      cluster_id: ringEvidence.map_point.cluster_id,
+      evidence_session_id: ringEvidence.session_id,
+      match_confidence: ringEvidence.operator_reconciliation.match_confidence,
+      accounts: ringEvidence.operator_reconciliation.linked_account_ids.map(
+        (account_id) => ({ account_id, in_review: false }),
+      ),
+      exposure_kzt: ringTelemetry.transfer_context.amount_kzt,
+      protected_kzt: 0,
+    },
+  ],
   population_map: {
     points: fixtureEvents.flatMap((event) => {
       if (!event.map_point) return [];

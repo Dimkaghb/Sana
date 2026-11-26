@@ -1,6 +1,6 @@
 # Shared data contracts
 
-**Contracts C and D version 1.3.0. Contracts A and B retain their existing schemas.** Source: PRD section 3 (pages 2-4), with Person Two behavior on pages 6-7. Field names and nesting are preserved. Schemas preserve the PRD example shapes and document the runtime extensions below.
+**Contract C version 1.4.0 and Contract D version 1.3.0. Contracts A and B retain their existing schemas.** Source: PRD section 3 (pages 2-4), with Person Two behavior on pages 6-7. Field names and nesting are preserved. Schemas preserve the PRD example shapes and document the runtime extensions below.
 
 Do not silently alter fields. Update schemas, this document, affected fixtures, and consumers together. Sample values are examples, not fixed constants unless explicitly stated (128 dimensions, event type, and decision modes).
 
@@ -123,3 +123,11 @@ Contracts C and D version 1.3 extend the original PRD with a fourth outcome, `ST
 The backend saves the stealth receipt, frozen simulated transfer and pending device notifications in one SQLite transaction. Both hold types count toward held KZT. Mobile displays neutral processing text and a reference. The analyst sees Silent Duress. A scoped Guardian hold includes `urgent` and `acknowledged` booleans. Stealth holds are immediately frozen. Other holds retain the manual freeze action. Acknowledgement records display in an authenticated, visible Guardian view. Neither push-provider acceptance nor a browser notification alone acknowledges the case.
 
 A Guardian can opt in to Web Push for their own device. The service worker receives a payload-free notification and opens the authenticated Guardian page. The server coalesces pending notifications per device and retries temporary failures for up to an hour. The held transfer remains in account history. Supply the operator contact with `SANA_PUSH_CONTACT` (a mailto URL) when using a real push service. The VAPID signing key and device endpoints are private local database records. Signing out closes the private view. Device notifications remain enabled until the Guardian disables them or revokes browser permission.
+
+## Linked account review
+
+The analyst snapshot includes `rings` for the active identity mode. Each entry reports the latest qualifying cross-account match for an operator, its evidence session, map cluster, cosine match, linked accounts and review status. The cluster is a visualization of the evidence session. The server uses the identity service's cross-account match and configured cosine threshold to determine membership.
+
+`POST /api/v1/rings/{evidence_session_id}/freeze` requires analyst authentication and the JSON body `{"confirmed":true}`. The server resolves the accounts from persisted evidence, rejects stale confirmation evidence, and activates the account restrictions after the identity service confirms the operator ban. It atomically records the reviews and freezes the ring's held transfers for the confirmed accounts. New transfers from accounts in review are held and frozen in the simulation. Account restrictions and attribution are scoped to the active identity mode.
+
+`exposure_kzt` sums uniquely attributed held transfers across the ring. `protected_kzt` is the portion frozen for accounts in review. When active rings share an account, new transfers are attributed to the first active review for that account. Both counters use simulated transfer amounts. Contract C 1.4 permits a sixth decision reason for `RING_ACCOUNT_REVIEW` under the default `demo-3` policy. Older events remain valid. Contract D reuses the existing hold outcomes.

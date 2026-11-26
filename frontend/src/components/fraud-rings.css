@@ -1,0 +1,97 @@
+.fraud-rings {
+  margin-block: 16px;
+}
+.fraud-ring-list {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+.fraud-ring {
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.fraud-ring h3 {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.fraud-ring header p {
+  font-size: 14px;
+}
+.fraud-ring header strong {
+  font-size: clamp(20px, 3vw, 29px);
+}
+.ring-graph {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 28px;
+}
+.ring-graph code,
+.ring-confirm-accounts {
+  overflow-wrap: anywhere;
+}
+.ring-operator,
+.ring-graph li {
+  display: grid;
+  gap: 4px;
+  padding: 9px 12px;
+  background: var(--tint);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.ring-graph ul {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  position: relative;
+}
+.ring-graph ul::before,
+.ring-graph ul::after,
+.ring-graph li::before {
+  content: "";
+  position: absolute;
+  background: var(--muted);
+}
+.ring-graph ul::before {
+  left: -14px;
+  top: 18px;
+  bottom: 18px;
+  width: 1px;
+}
+.ring-graph ul::after {
+  left: -28px;
+  top: 50%;
+  width: 14px;
+  height: 1px;
+}
+.ring-graph li {
+  position: relative;
+}
+.ring-graph li::before {
+  left: -15px;
+  top: 50%;
+  width: 14px;
+  height: 1px;
+}
+.fraud-ring footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.fraud-ring footer small,
+.ring-graph small {
+  display: block;
+  color: var(--muted);
+}
+.ring-confirm-accounts {
+  list-style: disc;
+  padding-inline-start: 1.25rem;
+}

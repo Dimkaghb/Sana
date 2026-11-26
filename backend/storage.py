@@ -40,6 +40,17 @@ class Store:
                 queued_at INTEGER, next_attempt INTEGER, attempts INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS observed_rings (operator TEXT PRIMARY KEY);
+            CREATE INDEX IF NOT EXISTS sessions_by_ring ON sessions(ring);
+            CREATE TABLE IF NOT EXISTS ring_account_reviews (
+                mode TEXT NOT NULL, account TEXT NOT NULL, operator TEXT NOT NULL,
+                evidence_session TEXT NOT NULL, analyst TEXT NOT NULL,
+                reviewed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (mode, account, operator)
+            );
+            CREATE TABLE IF NOT EXISTS ring_review_transfers (
+                session TEXT PRIMARY KEY, mode TEXT NOT NULL, operator TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS reviews_by_operator ON ring_review_transfers(mode, operator);
         """)
         # Existing decisions are append-only. Backfill once, then maintain totals
         # in the same transaction as each new session, including older writers.
@@ -82,7 +93,7 @@ class Store:
             ).fetchone()
             return row["digest"] == digest
 
-    def save(self, digest, event, decision, dossier, amount, inference, ring):
+    def save(self, digest, event, decision, dossier, amount, inference, ring, review=None):
         stealth = decision.get("ui_mode") == "STEALTH_HOLD"
         with self.db:
             self.db.execute(
@@ -99,7 +110,7 @@ class Store:
                     amount,
                     inference,
                     ring,
-                    int(stealth),
+                    int(stealth or review is not None),
                 ),
             )
 
@@ -107,6 +118,11 @@ class Store:
                 self.db.execute("""UPDATE guardian_push_devices SET pending=?, queued_at=unixepoch(),
                     next_attempt=0, attempts=0 WHERE account=?""", (event["session_id"], event["account_id"]))
 
+            if review is not None:
+                self.db.execute(
+                    "INSERT INTO ring_review_transfers VALUES (?,?,?)",
+                    (event["session_id"], dossier["ml_mode"], review["operator"]),
+                )
             self.db.execute(
                 "DELETE FROM pending_sessions WHERE id=?", (event["session_id"],)
             )
@@ -170,6 +186,7 @@ class Store:
                     and row["ban"] is None
                     and row["enrolled"] is None
                     and row["threshold"] is not None
+                    and self.account_review(event["account_id"], "live") is None
                     and eligible_for_enrollment(event, row["threshold"])
                 ),
             }
@@ -191,6 +208,88 @@ class Store:
             "SELECT status FROM bans WHERE operator=? AND mode=?", (operator, mode)
         ).fetchone()
         return row["status"] if row else None
+
+    def account_review(self, account, mode):
+        # A transfer is attributed to a single active review if multiple rings
+        # share the account. Prefer the first review created for that account.
+        return self.db.execute(
+            """SELECT operator, evidence_session FROM ring_account_reviews
+               WHERE mode=? AND account=? ORDER BY rowid LIMIT 1""",
+            (mode, account),
+        ).fetchone()
+
+    def rings(self, mode):
+        rows = self.db.execute(
+            """SELECT s.ring, s.id, s.account,
+                      json_extract(s.event,'$.map_point.cluster_id') cluster_id,
+                      json_extract(s.dossier,'$.linked_account_ids') linked,
+                      json_extract(s.dossier,'$.match_confidence') confidence
+               FROM observed_rings r JOIN sessions s ON s.rowid=(
+                   SELECT latest.rowid FROM sessions latest
+                   WHERE latest.ring=r.operator AND json_extract(latest.dossier,'$.ml_mode')=?
+                   ORDER BY latest.rowid DESC LIMIT 1
+               ) ORDER BY s.rowid DESC""",
+            (mode,),
+        )
+        for row in rows:
+            linked = sorted(set(json.loads(row["linked"] or "[]")))
+            if len(linked) < 2 or row["account"] not in linked or row["confidence"] is None:
+                continue
+            operator = row["ring"]
+            reviewed = {
+                r["account"] for r in self.db.execute(
+                    "SELECT account FROM ring_account_reviews WHERE mode=? AND operator=?",
+                    (mode, operator),
+                )
+            }
+            totals = self.db.execute(
+                """WITH attributed(id) AS (
+                       SELECT id FROM sessions WHERE ring=?
+                         AND json_extract(dossier,'$.ml_mode')=?
+                         AND id NOT IN (SELECT session FROM ring_review_transfers)
+                       UNION ALL
+                       SELECT session FROM ring_review_transfers WHERE mode=? AND operator=?
+                   )
+                   SELECT COALESCE(SUM(s.amount),0) exposure_kzt,
+                          COALESCE(SUM(CASE WHEN s.frozen=1 AND EXISTS (
+                              SELECT 1 FROM ring_account_reviews a
+                              WHERE a.account=s.account AND a.mode=? AND a.operator=?
+                          ) THEN s.amount ELSE 0 END),0) protected_kzt
+                   FROM attributed JOIN sessions s USING(id)
+                   WHERE s.account IN (SELECT value FROM json_each(?))""",
+                (operator, mode, mode, operator, mode, operator, json.dumps(linked)),
+            ).fetchone()
+            yield {
+                "operator_id": operator,
+                "evidence_session_id": row["id"],
+                "cluster_id": row["cluster_id"],
+                "match_confidence": row["confidence"],
+                "accounts": [
+                    {"account_id": account, "in_review": account in reviewed}
+                    for account in linked
+                ],
+                **dict(totals),
+            }
+
+    def freeze_ring(self, ring, mode, analyst):
+        operator = ring["operator_id"]
+        accounts = [entry["account_id"] for entry in ring["accounts"]]
+        with self.db:
+            self.db.execute(
+                "INSERT OR REPLACE INTO bans VALUES (?,?,?)", (operator, mode, "confirmed")
+            )
+            self.db.executemany(
+                """INSERT OR IGNORE INTO ring_account_reviews
+                   (mode,account,operator,evidence_session,analyst) VALUES (?,?,?,?,?)""",
+                ((mode, account, operator, ring["evidence_session_id"], analyst) for account in accounts),
+            )
+            self.db.execute(
+                """UPDATE sessions SET frozen=1
+                   WHERE ring=? AND json_extract(dossier,'$.ml_mode')=?
+                   AND account IN (SELECT account FROM ring_account_reviews WHERE mode=? AND operator=?)
+                   AND json_extract(decision,'$.ui_mode') IN ('MIRAGE_HOLD','STEALTH_HOLD')""",
+                (operator, mode, mode, operator),
+            )
 
     def guardian_holds(self, account):
         rows = self.db.execute(

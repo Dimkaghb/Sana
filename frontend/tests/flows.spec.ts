@@ -588,6 +588,70 @@ test("Guardian device alerts require opt-in and can be disabled", async ({
   expect(enabled).toBe(false);
 });
 
+test("ring freeze requires confirmation and refreshes protected KZT", async ({
+  page,
+}) => {
+  const evidence = fixture("ring/dashboard-event.json");
+  let requests = 0;
+  let frozen = false;
+  await page.routeWebSocket("**/ws/dashboard", () => {});
+  await page.route("**/api/v1/dashboard/init*", (route) =>
+    route.fulfill({
+      json: {
+        events: [evidence],
+        ml_mode: "live",
+        active_sessions: [],
+        population_map: null,
+        kpis: {
+          sessions: 1,
+          held_amount_kzt: 450000,
+          ring_count: 1,
+          average_inference_ms: 11.4,
+        },
+        rings: [
+          {
+            operator_id: "op_demo_ring",
+            cluster_id: 1,
+            evidence_session_id: evidence.session_id,
+            match_confidence: 0.93,
+            accounts: ["acc_student_101", "acc_victim_409", "acc_drop_772"].map(
+              (account_id) => ({ account_id, in_review: frozen }),
+            ),
+            exposure_kzt: 450000,
+            protected_kzt: frozen ? 450000 : 0,
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/v1/rings/sess_fixture_ring/freeze", (route) => {
+    requests++;
+    expect(route.request().postDataJSON()).toEqual({ confirmed: true });
+    frozen = true;
+    return route.fulfill({ json: { status: "confirmed" } });
+  });
+  await page.goto("/dashboard");
+  const panel = page.getByRole("region", { name: "Suspected mule rings" });
+  await expect(panel.getByText("Operator Cluster #1")).toBeVisible();
+  await expect(
+    panel.getByText(/exposure across 3 linked accounts/),
+  ).toBeVisible();
+  await expect(panel.getByText("₸ 0 protected")).toBeVisible();
+  const freeze = panel.getByRole("button", { name: "Freeze Linked Accounts" });
+  await freeze.click();
+  const dialog = page.getByRole("dialog", { name: "Freeze linked accounts?" });
+  await expect(dialog.getByRole("listitem")).toHaveCount(3);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  expect(requests).toBe(0);
+  await freeze.click();
+  await dialog.getByRole("button", { name: "Confirm freeze" }).click();
+  await expect(panel.getByText(/450.000 protected/)).toBeVisible();
+  await expect(
+    panel.getByRole("button", { name: "Linked accounts in review" }),
+  ).toBeDisabled();
+  expect(requests).toBe(1);
+});
+
 test("expanded population map retains group selection and opens the session dossier", async ({
   page,
 }) => {

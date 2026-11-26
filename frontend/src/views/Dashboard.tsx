@@ -48,6 +48,7 @@ import {
   Zap,
 } from "lucide-react";
 import { DecisionExplanation } from "../components/DecisionExplanation";
+import { FraudRings } from "../components/FraudRings";
 import { AccountDirectory } from "../components/AccountDirectory";
 import { ActivityChart, Signals } from "../components/Signals";
 import { Theme } from "../components/Theme";
@@ -482,6 +483,14 @@ export function Dashboard({ alias }: { alias?: string }) {
           </div>
         )}
         {view === "queue" && <ActivityChart events={events} />}
+        {view === "queue" && !!data?.rings?.length && (
+          <FraudRings
+            rings={data.rings}
+            preview={preview}
+            token={token}
+            refresh={refresh}
+          />
+        )}
         {view === "map" ? (
           <>
             <PopulationMap
@@ -522,6 +531,14 @@ export function Dashboard({ alias }: { alias?: string }) {
                   Next points
                 </Button>
               </div>
+            )}
+            {!!data?.rings?.length && (
+              <FraudRings
+                rings={data.rings}
+                preview={preview}
+                token={token}
+                refresh={refresh}
+              />
             )}
           </>
         ) : view === "signals" ? (

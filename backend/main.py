@@ -373,9 +373,12 @@ def create_app(settings=None, transport=None):
             recoil = analyze_tap_recoil(telemetry, policy)
             coercion = analyze_coercion(telemetry)
             physics_ms = round((time.perf_counter() - start) * 1000, 3)
+            account = telemetry["account_id"]
+            mode = state.config.mode
             budget = (
                 LOCAL_HOLD_IDENTITY_BUDGET
-                if local_hold_reasons(telemetry["transfer_context"], recoil, coercion, policy)
+                if state.store.account_review(account, mode) is not None
+                or local_hold_reasons(telemetry["transfer_context"], recoil, coercion, policy)
                 else IDENTITY_BUDGET
             )
             clock = asyncio.get_running_loop().time
@@ -392,13 +395,15 @@ def create_app(settings=None, transport=None):
             except TimeoutError:
                 ml = None
                 missed_deadline = True
-            mode = state.config.mode
+            # A freeze can complete while this request waits for identity access.
+            # Check the restriction immediately before deciding and persisting.
+            review = state.store.account_review(account, mode)
             operator = ml["operator_reconciliation"] if ml else {}
             op_id = operator.get("matched_operator_id")
             if mode == "mock" and state.store.ban_status(op_id, mode) == "confirmed":
                 operator["is_banned_operator"] = True
             outcome, scores, overall, flags, explanation = decide(
-                telemetry, recoil, coercion, ml, policy
+                telemetry, recoil, coercion, ml, policy, review
             )
             if missed_deadline:
                 flags.append(
@@ -478,7 +483,9 @@ def create_app(settings=None, transport=None):
                 op_id if any(f["code"] == "DROPPER_RING_MATCH" for f in flags) else None
             )
             inference = ml["inference_ms"] if mode == "live" and ml else None
-            state.store.save(digest, event, decision, dossier, amount, inference, ring)
+            if review is not None:
+                dossier["account_review"] = dict(review)
+            state.store.save(digest, event, decision, dossier, amount, inference, ring, review)
             if outcome == "STEALTH_HOLD":
                 state.push.wake.set()
             await notify(event)
@@ -507,6 +514,7 @@ def create_app(settings=None, transport=None):
             "ml_mode": state.config.mode,
             "active_sessions": list(state.phones),
             "population_map": population,
+            "rings": list(state.store.rings(state.config.mode)),
         }
 
     @app.get("/api/v1/mobile/history")
@@ -604,6 +612,8 @@ def create_app(settings=None, transport=None):
                     "Session has insufficient or conflicting evidence for enrollment",
                 )
             operator = event["map_point"]["operator_id"]
+            if state.store.account_review(row["account"], "live") is not None:
+                raise HTTPException(409, "Account has an active ring review")
             if state.store.ban_status(operator, "live") is not None:
                 raise HTTPException(
                     409, "An operator ban was requested for this identity"
@@ -635,6 +645,31 @@ def create_app(settings=None, transport=None):
                 state.store.set_ban(operator, mode, "confirmed")
                 await notify({"type": "DASHBOARD_REFRESH"})
         return {"operator_id": operator, "status": "confirmed"}
+
+    @app.post("/api/v1/rings/{session}/freeze")
+    async def freeze_ring(session: str, request: Request):
+        admin(request)
+        body = await read_json(request, 1024)
+        if not isinstance(body, dict) or set(body) != {"confirmed"} or body["confirmed"] is not True:
+            raise HTTPException(422, "Explicit confirmation is required")
+        state = app.state
+        mode = state.config.mode
+        async with state.identity_access.change():
+            row = state.store.session(session)
+            if not row or not row["ring"] or json.loads(row["dossier"]).get("ml_mode") != mode:
+                raise HTTPException(404, "Ring evidence not found")
+            ring = next((item for item in state.store.rings(mode) if item["operator_id"] == row["ring"]), None)
+            if not ring or ring["evidence_session_id"] != session:
+                raise HTTPException(409, "Ring evidence changed. Review the current linked accounts.")
+            if not all(account["in_review"] for account in ring["accounts"]):
+                operator = ring["operator_id"]
+                if state.store.ban_status(operator, mode) != "confirmed":
+                    if not await state.ml.ban(operator):
+                        raise HTTPException(502, "Identity service did not confirm the operator ban")
+                state.store.freeze_ring(ring, mode, identity(request, "analyst") or "analyst-token")
+        await notify({"type": "DASHBOARD_REFRESH"})
+        await asyncio.gather(*(refresh_guardian(account["account_id"]) for account in ring["accounts"]))
+        return {"status": "confirmed"}
 
     @app.get("/api/v1/guardian/push-key")
     async def push_key(request: Request):

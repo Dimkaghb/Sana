@@ -25,7 +25,7 @@ def local_hold_reasons(context, recoil, coercion, policy):
     return reasons
 
 
-def decide(telemetry, recoil: Evidence, coercion: Evidence, ml, policy: Policy):
+def decide(telemetry, recoil: Evidence, coercion: Evidence, ml, policy: Policy, review=None):
     context = telemetry["transfer_context"]
     flags = [*recoil.flags, *coercion.flags]
     owner = ml["owner_verification"] if ml else {}
@@ -98,6 +98,10 @@ def decide(telemetry, recoil: Evidence, coercion: Evidence, ml, policy: Policy):
         reasons.append(reason("HANDOFF_AMOUNT", "Owner mismatch on a large transfer",
                               f"The identity service reported a possible handoff. The transfer of ₸{context['amount_kzt']:,} met the ₸{policy.handoff_amount:,} hold threshold."))
     reasons.extend(local_hold_reasons(context, recoil, coercion, policy))
+    if review is not None:
+        detail = "An analyst placed this account in review after a cross-account operator match."
+        flags.append(flag("RING_ACCOUNT_REVIEW", "CRITICAL", "Linked account in review", detail))
+        reasons.insert(0, reason("RING_ACCOUNT_REVIEW", "Linked account in review", detail))
     if any(r["code"] == "COERCION_NEW_RECIPIENT" for r in reasons):
         decision = "STEALTH_HOLD"
     elif reasons:
