@@ -139,6 +139,7 @@ export function Dashboard() {
   const [token, setToken] = useState("");
   const [target, setTarget] = useState("");
   const [notice, setNotice] = useState("");
+  const [ownerVerified, setOwnerVerified] = useState(false);
   const [working, setWorking] = useState(false);
   const [dossier, setDossier] = useState<Record<string, unknown>>();
   const [range, setRange] = useState("all");
@@ -148,6 +149,19 @@ export function Dashboard() {
   const active = data?.active_sessions || [];
   const liveTarget = active.includes(target) ? target : active[0];
   const selectedEvent = events.find((e) => e.session_id === dot?.session_id);
+  const canEnroll =
+    !preview &&
+    data?.ml_mode === "live" &&
+    dot?.status !== "BANNED" &&
+    !dot?.synthetic &&
+    selectedEvent?.map_point &&
+    selectedEvent.decision !== "MIRAGE_HOLD" &&
+    [
+      selectedEvent.scores.anti_rat_physics_risk,
+      selectedEvent.scores.coercion_stress_risk,
+      selectedEvent.overall_risk_score,
+    ].every((s) => s != null && s < 50) &&
+    selectedEvent.flags.every((f) => f.code === "IDENTITY_UNAVAILABLE");
   const fixtureIdentity =
     preview && selectedEvent
       ? fixtureIdentities[selectedEvent.session_id]
@@ -181,6 +195,7 @@ export function Dashboard() {
     setCredentials(false);
     setDot(undefined);
     setDossier(undefined);
+    setOwnerVerified(false);
   }
   async function action(endpoint: string, body?: unknown, download = false) {
     if (!token) {
@@ -209,7 +224,15 @@ export function Dashboard() {
         setDossier(await res.json());
         setNotice("");
       } else {
-        setNotice("Command accepted.");
+        if (endpoint.endsWith("/enroll")) {
+          const result = await res.json();
+          setOwnerVerified(false);
+          setNotice(
+            "Owner enrollment confirmed. Baseline sessions for future scoring: " +
+              result.baseline_sessions_count +
+              ".",
+          );
+        } else setNotice("Command accepted.");
         refresh();
       }
     } catch (e) {
@@ -220,12 +243,16 @@ export function Dashboard() {
   }
   function inspect(e: DashboardEvent) {
     setSelected(e.session_id);
+    const projection = data?.population_map?.points.find(
+      (p) => p.session_id === e.session_id,
+    );
     setDot({
-      ...e.map_point,
-      x: e.map_point?.x ?? 0,
-      y: e.map_point?.y ?? 0,
-      cluster_id: e.map_point?.cluster_id ?? -1,
-      status: e.decision,
+      operator_id: e.map_point?.operator_id,
+      synthetic: projection?.synthetic,
+      status:
+        projection?.status === "BANNED"
+          ? "BANNED"
+          : e.map_point?.status || e.decision,
       session_id: e.session_id,
       account_id: e.account_id,
     });
@@ -644,6 +671,33 @@ export function Dashboard() {
                   <ArrowDownToLine size={16} /> Preview dossier
                 </button>
               </div>
+              {canEnroll && (
+                <div className="enrollment">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={ownerVerified}
+                      onChange={(e) => setOwnerVerified(e.target.checked)}
+                    />{" "}
+                    I independently verified this account owner for this
+                    session.
+                  </label>
+                  <button
+                    className="primary"
+                    disabled={working || !ownerVerified}
+                    onClick={() =>
+                      void action(
+                        "/api/v1/sessions/" +
+                          encodeURIComponent(selectedEvent!.session_id) +
+                          "/enroll",
+                        { owner_verified: true },
+                      )
+                    }
+                  >
+                    Enroll verified session
+                  </button>
+                </div>
+              )}
               {dossier && (
                 <details open className="export-preview">
                   <summary>Case export preview</summary>

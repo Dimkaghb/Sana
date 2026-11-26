@@ -28,7 +28,11 @@ export interface DashboardData {
   ml_mode: "mock" | "live";
   active_sessions: string[];
   population_map: {
-    points: (MapPoint & { session_id?: string; account_id?: string })[];
+    points: (MapPoint & {
+      session_id?: string;
+      account_id?: string;
+      synthetic?: boolean;
+    })[];
     clusters: unknown[];
   } | null;
   kpis: {

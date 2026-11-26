@@ -215,3 +215,151 @@ test("population view preserves current ban status over the historical session s
   await expect(page.getByText("Operator status · banned")).toBeVisible();
   await expect(page.getByText("Synthetic seed session")).toBeVisible();
 });
+
+test("clean live session enrollment requires independent verification and analyst token", async ({
+  page,
+}) => {
+  await page.routeWebSocket("**/ws/dashboard", () => {});
+  await page.route("**/api/v1/dashboard/init", (r) =>
+    r.fulfill({
+      json: {
+        ml_mode: "live",
+        events: [event],
+        active_sessions: [],
+        population_map: null,
+        kpis: {
+          sessions: 1,
+          held_amount_kzt: 0,
+          ring_count: 0,
+          average_inference_ms: null,
+        },
+      },
+    }),
+  );
+  let requests = 0;
+  await page.route("**/api/v1/sessions/*/enroll", (r) => {
+    expect(r.request().headers().authorization).toBe("Bearer enrollment-demo");
+    expect(r.request().postDataJSON()).toEqual({ owner_verified: true });
+    requests++;
+    return r.fulfill({
+      json: {
+        session_id: event.session_id,
+        account_id: event.account_id,
+        baseline_sessions_count: 3,
+      },
+    });
+  });
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Analyst access" }).click();
+  await page.getByLabel("Analyst token").fill("enrollment-demo");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page
+    .getByRole("button", { name: "Inspect " + event.session_id, exact: true })
+    .click();
+  const enroll = page.getByRole("button", { name: "Enroll verified session" });
+  await expect(enroll).toBeDisabled();
+  await page
+    .getByRole("checkbox", { name: /I independently verified/ })
+    .check();
+  await enroll.click();
+  await expect(page.getByRole("dialog").getByRole("status")).toContainText(
+    "future scoring: 3",
+  );
+  await expect(enroll).toBeDisabled();
+  expect(requests).toBe(1);
+});
+
+test("denied motion permission leaves touch capture available and calibration opt-in scoped to one transfer", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window.DeviceMotionEvent, "requestPermission", {
+      value: () => Promise.resolve("denied"),
+    });
+    Object.defineProperty(window.DeviceOrientationEvent, "requestPermission", {
+      value: () => Promise.resolve("denied"),
+    });
+  });
+  await page.routeWebSocket("**/ws/mobile/*", () => {});
+  let submitted: SessionTelemetry | null = null,
+    saved: SessionTelemetry | null = null;
+  await page.route("**/api/v1/sessions/ingest", (r) => {
+    const payload = r.request().postDataJSON();
+    submitted = payload;
+    return r.fulfill({ json: { ...d, session_id: payload.session_id } });
+  });
+  await page.route("**/api/v1/calibration/sessions", (r) => {
+    expect(r.request().headers()["x-calibration-consent"]).toBe("granted");
+    saved = r.request().postDataJSON();
+    return r.fulfill({ json: { recording: "test" } });
+  });
+  await startPhone(page);
+  await expect(page.getByText("Доступ к датчикам ограничен.")).toBeVisible();
+  await page.getByLabel("Сохранить телеметрию для калибровки").check();
+  await page
+    .getByRole("button", { name: "Подтвердить перевод" })
+    .press("Enter");
+  await expect(page.getByText("Запись калибровки сохранена.")).toBeVisible();
+  expect(saved).toEqual(submitted);
+  expect((submitted as unknown as SessionTelemetry).imu_samples).toEqual([]);
+  await page.getByRole("button", { name: "Новый перевод" }).click();
+  await page
+    .getByRole("button", { name: "Включить защиту SANA Shield" })
+    .click();
+  await expect(
+    page.getByLabel("Сохранить телеметрию для калибровки"),
+  ).not.toBeChecked();
+});
+
+test("browser virtual sensors retain stationary orientation while motion continues sampling", async ({
+  page,
+}) => {
+  const client = await page.context().newCDPSession(page);
+  const types = [
+    "accelerometer",
+    "linear-acceleration",
+    "gyroscope",
+    "relative-orientation",
+  ] as const;
+  for (const type of types)
+    await client.send("Emulation.setSensorOverrideEnabled", {
+      type,
+      enabled: true,
+    });
+  await page.routeWebSocket("**/ws/mobile/*", () => {});
+  let received: SessionTelemetry | null = null;
+  await page.route("**/api/v1/sessions/ingest", (r) => {
+    const body = r.request().postDataJSON();
+    received = body;
+    return r.fulfill({ json: { ...d, session_id: body.session_id } });
+  });
+  await page.goto("/mobile");
+  await page
+    .getByRole("button", { name: "Включить защиту SANA Shield" })
+    .click();
+  for (const type of types)
+    await client.send("Emulation.setSensorOverrideReadings", {
+      type,
+      reading:
+        type === "relative-orientation"
+          ? { quaternion: { x: 0, y: 0, z: 0, w: 1 } }
+          : { xyz: { x: 0, y: 0, z: 0 } },
+    });
+  for (const char of ["0", "1", "2", "3"])
+    await page.getByRole("button", { name: char, exact: true }).click();
+  // Stationary orientation emits on change; use a full observation window.
+  await page.waitForTimeout(650);
+  await page
+    .getByRole("button", { name: "Подтвердить перевод" })
+    .press("Enter");
+  await expect(page.getByText(d.reference_code)).toBeVisible();
+  const payload = received as unknown as SessionTelemetry;
+  expect(payload.imu_samples.length).toBeGreaterThan(8);
+  expect(
+    payload.imu_samples.at(-1)!.t_ms - payload.imu_samples[0].t_ms,
+  ).toBeGreaterThan(450);
+  const measured =
+    ((payload.imu_samples.length - 1) * 1000) /
+    (payload.imu_samples.at(-1)!.t_ms - payload.imu_samples[0].t_ms);
+  expect(payload.device_meta.sample_rate_hz).toBeCloseTo(measured);
+});

@@ -1193,3 +1193,25 @@ dialog input,
     scroll-behavior: auto !important;
   }
 }
+.enrollment {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.enrollment label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: #c0d1c4;
+}
+.enrollment input {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  accent-color: #57c48b;
+  margin: 2px 0;
+}
+.enrollment button {
+  margin-top: 10px;
+}

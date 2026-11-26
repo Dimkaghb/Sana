@@ -12,7 +12,10 @@ interface Dot {
   cluster_id: number;
   synthetic?: boolean;
 }
-export type SelectedDot = Dot;
+export type SelectedDot = Pick<
+  Dot,
+  "operator_id" | "session_id" | "account_id" | "status" | "synthetic"
+>;
 export function PopulationMap({
   data,
   selected,

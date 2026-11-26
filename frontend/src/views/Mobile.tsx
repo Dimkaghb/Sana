@@ -104,24 +104,29 @@ function Transfer({
   const [progress, setProgress] = useState(0);
   const track = useRef<HTMLDivElement>(null);
   const dragged = useRef<number | undefined>(undefined);
-  const sdk = useKinetiq(account, !!permission && !result && !fixture, () => {
-    const element = track.current;
-    if (!element || !canSubmit || !window.PointerEvent) return;
-    // A browser-generated pointer event reaches the same collector as a physical tap.
-    const rect = element.getBoundingClientRect();
-    const init = {
-      bubbles: true,
-      clientX: rect.left + rect.width / 2,
-      clientY: rect.top + rect.height / 2,
-      pointerId: 9001,
-      pointerType: "mouse",
-      width: 0,
-      height: 0,
-    };
-    element.dispatchEvent(new PointerEvent("pointerdown", init));
-    element.dispatchEvent(new PointerEvent("pointerup", init));
-    void submit();
-  });
+  const sdk = useKinetiq(
+    account,
+    !!permission && !result && !fixture,
+    () => {
+      const element = track.current;
+      if (!element || !canSubmit || !window.PointerEvent) return;
+      // A browser-generated pointer event reaches the same collector as a physical tap.
+      const rect = element.getBoundingClientRect();
+      const init = {
+        bubbles: true,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+        pointerId: 9001,
+        pointerType: "mouse",
+        width: 0,
+        height: 0,
+      };
+      element.dispatchEvent(new PointerEvent("pointerdown", init));
+      element.dispatchEvent(new PointerEvent("pointerup", init));
+      void submit();
+    },
+    permission === "allowed",
+  );
   const canSubmit =
     (!!fixture || !!sdk) &&
     !busy &&
