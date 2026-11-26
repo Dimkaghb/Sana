@@ -40,9 +40,11 @@ For live scoring, prepare the seed, model, and local identity service using the 
 .venv/bin/python scripts/validate_contracts.py
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python -m scripts.check_demo
+# After preparing the live model and ML environment:
+.venv/bin/python -m scripts.check_live
 ```
 
-The last command starts an isolated mock-mode service, uses HTTP and WebSocket clients, checks the seven scenarios, and restarts the service against its temporary database. Component-specific checks are in the [frontend](frontend/README.md), [backend](backend/README.md), and [ML](ml/README.md) guides.
+The demo check starts an isolated mock-mode service, uses HTTP and WebSocket clients, checks the seven scenarios, and restarts the service against its temporary database. Component-specific checks are in the [frontend](frontend/README.md), [backend](backend/README.md), and [ML](ml/README.md) guides.
 
 ## Project references
 

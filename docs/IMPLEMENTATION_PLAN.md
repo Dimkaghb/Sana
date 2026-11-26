@@ -31,6 +31,8 @@ Exit: A produces a stored decision, C event, and D response with matching identi
 
 ## Step 3 - Real mobile telemetry SDK
 
+**Verification** — Implemented and exercised with Chromium touch input, permission denial, account switching, retries, and virtual motion sensors. The system WebKit mobile layout completed a step-up transfer. Physical iPhone and Android validation is pending.
+
 Dependencies: Step 2 and callback agreement with Person One. Start sensor/HTTPS feasibility during Step 2.
 
 - Implement `KinetiqSDK` and thin `useKinetiq.ts` adapter in `frontend/src/sdk/`.
@@ -45,6 +47,8 @@ Exit: iPhone and Android payloads validate over HTTPS; denied permissions are ha
 
 ## Step 4 - Recoil detection and attack simulator
 
+**Verification** — The targeted simulator, covered recoil, missing coverage, and protected commands passed software integration. Physical calibration on different surfaces and phones is pending.
+
 Dependencies: Step 3 for real calibration; pure functions can start from fixtures earlier.
 
 - Use PRD windows: tap [-40,+40] ms, baseline [-40,-15] ms, impact [-5,+35] ms.
@@ -58,6 +62,8 @@ Exit: explainable normal/synthetic results, correctly targeted commands, and no 
 
 ## Step 5 - Coercion and calibrated risk fusion
 
+**Verification** — Deterministic boundary and synthetic cadence tests passed. Configurable versioned policy values are included in case evidence. Real-world false-positive evaluation is pending.
+
 - Implement repeated 2-4-digit bursts (<300 ms gaps), >900 ms pauses, and sufficient-observation checks.
 - Use acceleration for MVP 8-12 Hz FFT: Contract A has orientation, not angular velocity. Validate sampling/duration/gaps, resample continuous segments, detrend, and window.
 - Add smoothed posture transitions with hysteresis. A pause, posture change, or spectral peak is not proof of coercion.
@@ -67,6 +73,8 @@ Exit: explainable normal/synthetic results, correctly targeted commands, and no 
 Exit: deterministic fixture behavior and policy checks pass; inadequate recordings stay unavailable; real false-positive evaluation remains distinct from synthetic tests.
 
 ## Step 6 - Live ML, operator actions, dossier export
+
+**Verification** — Verified real HTTP scoring, unchanged owner baselines before explicit enrollment, protected operator ban, re-entry, case fingerprint, export, and failure recovery.
 
 Dependencies: agreed B/map/ban and safe-baseline interfaces from Person Three.
 
@@ -81,6 +89,8 @@ Exit: UI consumes stable interfaces, bans/exports work, and failure states are r
 
 ## Step 7 - Semifinal verification
 
+**Verification** — The eight-slide presentation and sixty-second software backup are ready. Software rehearsals passed. Consented real-person sessions, device measurements, and a timed two-phone performance are pending.
+
 - Collect five real sessions from each of four people for Person Three; keep recordings/participant mapping out of Git and separate enrollment/evaluation.
 - Rehearse normal transfer, synthetic input, handoff, cross-account match, ban, and export.
 - Test sensor denial, ML outage, dashboard reconnect, retries, account switch, and restart.
@@ -90,6 +100,8 @@ Exit: UI consumes stable interfaces, bans/exports work, and failure states are r
 Exit: repeatable demonstration and truthful metrics; no claims of production accuracy or real escrow.
 
 ## Step 8 - Offline final and Guardian extension
+
+**Verification** — The scoped Guardian WebSocket, delivery acknowledgement, freeze, reconnect recovery, local serving and TLS rehearsal passed on the laptop. The final two-phone LAN rehearsal and participant calibration are pending.
 
 - Nov 27-29: timing, coverage, calibration, real-device contract checks.
 - Nov 30-Dec 3: thresholds, reconnect/failure handling, cross-device false positives.
