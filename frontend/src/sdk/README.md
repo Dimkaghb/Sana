@@ -1,9 +1,9 @@
-# Telemetry SDK - Person Two
+# KinetiqSDK
 
-Implementation starts in Step 3 of `../../../docs/IMPLEMENTATION_PLAN.md`.
+Import the SDK, sensor-permission request, React lifecycle hook, or contract types through `frontend/src/sdk/index.ts`. Call `requestSensorAccess()` in the initiating user gesture, then use `useKinetiq(accountId, enabled, onDemoCommand)`. For a headless integration, construct `new KinetiqSDK(accountId)`, call `start(onDemoCommand)`, and always call `stop()` on disposal.
 
-Planned files: `kinetiq-sdk.ts`, `useKinetiq.ts`, collectors, bounded buffer, transport, and contract-aligned types. Keep the headless core independent of React.
+Mark transfer controls with `data-kinetiq-field`. Custom keypad buttons set `data-key-group="digit"` or `"backspace"` and the slider sets `data-kinetiq-field="slider"`. The collector records native pointer provenance and geometry, paired key timings, and active slider points. Text and key values are outside the collector’s input. Motion uses browser-provided linear acceleration in m/s² and orientation in degrees. A motion record requires a complete orientation reading from the previous 250 ms. Contract A’s measured frequency requires at least two complete observations.
 
-Planned public capabilities: sensor activation, session/account reset, marked-input or custom-keypad timing, slider callbacks, submission of Contract A, consumption of Contract D, and cleanup. These are not existing exports.
+`submit({ amount_kzt, is_new_recipient })` waits for the post-tap window, freezes a bounded session snapshot, closes collection and command delivery, and returns Contract D. Concurrent and retried calls use the same payload. The snapshot retains at most 20 seconds and 4,096 motion records. A new transfer or account gets a new SDK instance.
 
-Preserve `KinetiqSDK` and `data-kinetiq-field`. Do not fabricate absent contact, dwell, orientation, or motion measurements.
+`saveCalibrationWithConsent()` is available following submission and sends the frozen payload to the explicitly enabled local calibration endpoint. The mobile view calls it only for a transfer on which the participant selected the consent checkbox.
