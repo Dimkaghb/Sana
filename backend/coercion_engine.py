@@ -1,6 +1,7 @@
 """Exploratory cadence and movement indicators for the simulated decision."""
 
 import numpy as np
+from numpy.fft import rfft, rfftfreq
 
 from .physics_engine import Evidence, flag
 
@@ -43,10 +44,10 @@ def motion_indicators(samples):
     motion = np.array([np.interp(grid, times, axis) for axis in axes])
     acceleration = motion[:3]
     acceleration -= acceleration.mean(axis=1, keepdims=True)
-    power = (abs(np.fft.rfft(acceleration * np.hanning(len(grid)), axis=1)) ** 2).sum(
+    power = (abs(rfft(acceleration * np.hanning(len(grid)), axis=1)) ** 2).sum(
         axis=0
     )
-    hz = np.fft.rfftfreq(len(grid), 1 / 40)
+    hz = rfftfreq(len(grid), 1 / 40)
     total = power[(hz >= 1) & (hz <= 16)].sum()
     ratio = float(power[(hz >= 8) & (hz <= 12)].sum() / total) if total > 0 else 0.0
     # A ratio alone can be large even at the instrument noise floor.

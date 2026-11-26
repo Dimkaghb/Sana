@@ -241,12 +241,17 @@ def create_app(settings=None, transport=None):
                 if local_hold(telemetry["transfer_context"], recoil, coercion, policy)
                 else IDENTITY_BUDGET
             )
+            clock = asyncio.get_running_loop().time
+            deadline = clock() + budget
             missed_deadline = False
             try:
                 # Includes both waiting for an identity mutation and the ML call.
                 # No await occurs between releasing read access and committing C/D.
-                async with asyncio.timeout(budget), state.identity_access.score():
+                async with asyncio.timeout_at(deadline), state.identity_access.score():
                     ml = await state.ml.score(telemetry)
+                    # A synchronous decode or schema check can run across the timer.
+                    if clock() >= deadline:
+                        raise TimeoutError
             except TimeoutError:
                 ml = None
                 missed_deadline = True
