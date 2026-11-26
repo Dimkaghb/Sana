@@ -33,7 +33,7 @@ At least two usable behavioral streams are required. Transfer amount and account
 | --- | --- |
 | `POST /ml/embed-and-score` | Accept Contract A and return B. Inadequate evidence or invalid telemetry returns HTTP 422. An identical session retry returns its originally stored B. Changed data under an existing ID returns 409. A new operator has a provisional ID and null match confidence. A cold account has null owner similarity. |
 | `GET /ml/population-map` | Returns `points` with session, account, operator, coordinates, cluster, status, and synthetic marker plus `clusters` with centroid and size. These are ML observations. The backend owns transfer decisions. |
-| `POST /ml/sessions/{session_id}/enroll` | Bearer-protected operator attestation that the scored session belongs to the independently verified account owner. Updates its normalized 0.8/0.2 EMA once. Three enrolled sessions enable the handoff rule. Scoring alone never enrolls a session. |
+| `POST /ml/sessions/{session_id}/enroll` | Bearer-protected operator attestation that the scored session belongs to the independently verified account owner. Updates its normalized 0.8/0.2 EMA once. Three enrolled sessions enable the handoff rule. Scoring alone never enrolls a session. New enrollment returns 409 for a historical handoff or qualifying ring match, a banned operator, or a matching current ban centroid. An already-approved enrollment retry returns the existing count. |
 | `POST /ml/operators/{operator_id}/ban` | Bearer-protected, idempotent ban. Saves the operator centroid for subsequent cross-account checks. Returns the operator ID and confirmed status. |
 | `GET /ml/sessions/{session_id}/fingerprint` | Bearer-protected SHA-256 of the full stored session embedding in little-endian float32 order. The original case fingerprint survives model rotation. |
 | `POST /ml/retrain` | Bearer-protected calibration, index rebuild, and atomic generation switch. Requires the consented source recording for each existing live embedding to re-embed it. Missing recordings preserve the active generation and return 409. Historical B responses, enrollment order, case fingerprints, and bans survive a successful switch. |
@@ -80,3 +80,9 @@ Both models trained on 108 generated sessions from 18 simulated operators. A dif
 | Feature extraction and encoder p95 | 1.37 ms | 1.12 ms |
 
 With the baseline service on localhost, 20 fresh synthetic HTTP submissions returned schema-valid B. Warm ML compute p95 was 5.67 ms and full ML HTTP p95 was 17.03 ms on the development machine. The seeded map contained 150 points, 18 density clusters and two inferred four-account rings. The baseline remains the default pending real participant and device measurements.
+
+### Qdrant server rehearsal
+
+The native Qdrant 1.20.2 Apple Silicon server was exercised on loopback with telemetry disabled, using the same service routes and model. With the default optimizer threshold of 10,000 KiB, the seeded global collection reported 150 points and zero indexed vectors. At that size it used exact vector search. Enrollment, retry, cross-account match, ban, re-entry, and fingerprint export all passed against the server.
+
+A separate check lowered the optimizer and full-scan thresholds to 10 KiB on the disposable global collection. Qdrant then reported 155 indexed vectors for 155 points. Vector queries and a subsequent ML scoring request succeeded with the HNSW index present. The server selects the search strategy per query and filter. The application keeps the server's default thresholds.

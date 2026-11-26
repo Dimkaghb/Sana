@@ -91,6 +91,9 @@ class IdentityApiTests(unittest.TestCase):
                         ],
                         i + 1,
                     )
+            http.post(
+                score_path, json={**raw, "session_id": "pending"}
+            ).raise_for_status()
             crossing = {**raw, "session_id": "cross", "account_id": "another"}
             result = http.post(score_path, json=crossing).json()
             route = "/ml/sessions/cross/fingerprint"
@@ -99,6 +102,12 @@ class IdentityApiTests(unittest.TestCase):
                 "operator_fingerprint"
             ]
             self.assertRegex(fingerprint, r"^[0-9a-f]{64}$")
+            self.assertEqual(
+                http.post(
+                    "/ml/sessions/cross/enroll", headers=self.headers
+                ).status_code,
+                409,
+            )
             rec = result["operator_reconciliation"]
             self.assertEqual(rec["ring_size"], 2)
             self.assertGreater(rec["match_confidence"], 0.99)
@@ -127,7 +136,19 @@ class IdentityApiTests(unittest.TestCase):
             self.assertEqual(
                 arrival["owner_verification"]["baseline_sessions_count"], 0
             )
-            self.assertEqual(len(http.get("/ml/population-map").json()["points"]), 5)
+            self.assertEqual(
+                http.post(
+                    "/ml/sessions/pending/enroll", headers=self.headers
+                ).status_code,
+                409,
+            )
+            self.assertEqual(
+                http.post(
+                    "/ml/sessions/approved_0/enroll", headers=self.headers
+                ).json()["baseline_sessions_count"],
+                3,
+            )
+            self.assertEqual(len(http.get("/ml/population-map").json()["points"]), 6)
 
     def test_invalid_payloads_and_empty_evidence(self):
         raw = session(0, 8)
@@ -217,6 +238,13 @@ class IdentityApiTests(unittest.TestCase):
             verified = result["owner_verification"]
             self.assertEqual(verified["baseline_sessions_count"], 3)
             self.assertTrue(verified["is_handoff_detected"], verified)
+            sid = other["session_id"]
+            self.assertEqual(
+                http.post(
+                    f"/ml/sessions/{sid}/enroll", headers=self.headers
+                ).status_code,
+                409,
+            )
 
 
 if __name__ == "__main__":

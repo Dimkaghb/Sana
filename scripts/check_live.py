@@ -14,9 +14,8 @@ from scripts.check_demo import server
 from scripts.validate_contracts import FIXTURES, ROOT, load_json
 
 
-async def exercise(directory, identity, identity_url, token):
+async def exercise(directory, identity_url, token):
     payload = load_json(FIXTURES / "normal/telemetry.json")
-    auth = {"Authorization": f"Bearer {token}"}
     async with server(directory, mode="live", ml_url=identity_url, ml_token=token) as (bank, _, analyst):
         async def submit(session, account):
             data = dict(payload, session_id=session, account_id=account)
@@ -29,7 +28,9 @@ async def exercise(directory, identity, identity_url, token):
             session = f"check_enroll_{index}"
             decision = await submit(session, "acc_example_owner")
             assert decision["ui_mode"] == "STEP_UP_LIVENESS", decision
-            enrollment = await identity.post(f"/ml/sessions/{session}/enroll", headers=auth)
+            enrollment = await bank.post(f"/api/v1/sessions/{session}/enroll",
+                                         headers={"Authorization": f"Bearer {analyst}"},
+                                         json={"owner_verified": True})
             enrollment.raise_for_status()
             assert enrollment.json()["baseline_sessions_count"] == index + 1
 
@@ -80,7 +81,7 @@ async def main(interpreter, model):
                     await asyncio.sleep(.2)
                 else:
                     raise TimeoutError("Identity service startup timed out")
-                await exercise(directory, client, url, token)
+                await exercise(directory, url, token)
         finally:
             child.terminate()
             try:

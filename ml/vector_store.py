@@ -195,7 +195,7 @@ class IdentityStore:
                 or vector_digest(point.vector),
             }
 
-    def enroll(self, sid, scope="live"):
+    def enroll(self, sid, scope="live", *, restore_verified=False):
         with self.lock:
             p = self.get("global_sessions", sid, scope)
             if not p:
@@ -204,6 +204,25 @@ class IdentityStore:
             owner = self.get("account_centroids", account, scope)
             enrolled = owner.payload["enrolled"] if owner else []
             if sid not in enrolled:
+                if scope == "live" and not restore_verified:
+                    scored = p.payload["result"]
+                    identity = scored["operator_reconciliation"]
+                    operator = identity["matched_operator_id"]
+                    if (
+                        scored["owner_verification"]["is_handoff_detected"]
+                        or identity["is_banned_operator"]
+                        or (
+                            identity["ring_size"] >= 2
+                            and (identity["match_confidence"] or 0) >= 0.80
+                        )
+                        or self.get("banned_operators", operator, scope)
+                        or self.neighbors(
+                            "banned_operators", np.asarray(p.vector), scope, 1
+                        )
+                    ):
+                        raise Conflict(
+                            "Session has conflicting identity evidence and cannot enroll an owner"
+                        )
                 vector = (
                     normalize(
                         0.8 * np.asarray(owner.vector) + 0.2 * np.asarray(p.vector)
@@ -280,7 +299,7 @@ class IdentityStore:
             )
         for owner in previous.scroll("account_centroids"):
             for sid in owner.payload["enrolled"]:
-                self.enroll(sid, owner.payload["scope"])
+                self.enroll(sid, owner.payload["scope"], restore_verified=True)
         for ban in previous.scroll("banned_operators"):
             self.ban(ban.payload["operator_id"], ban.payload["scope"])
 
