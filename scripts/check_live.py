@@ -97,6 +97,6 @@ async def main(interpreter, model):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ml-python", type=Path, default=ROOT/"ml/.venv/bin/python")
-    parser.add_argument("--model", type=Path, default=ROOT/"ml/artifacts/synthetic-v1")
+    parser.add_argument("--model", type=Path, default=ROOT/"ml/artifacts/synthetic-v2")
     args = parser.parse_args()
     asyncio.run(main(args.ml_python, args.model))

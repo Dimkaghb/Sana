@@ -109,10 +109,21 @@ class IdentityService:
         except (httpx.HTTPError, ValueError, TimeoutError, RecursionError):
             return None
 
-    async def population(self):
+    async def population(self, page=None):
         if self.config.mode == "mock":
             return {"points": [], "clusters": []}
         try:
+            if page is not None:
+                query = {} if page == "first" else {"cursor": page}
+                result = await self.request("GET", "/ml/population-page", params=query)
+                if not isinstance(result, dict):
+                    return None
+                cursor = result.pop("next", None)
+                if cursor is not None and (not isinstance(cursor, str) or not re.fullmatch(r"[0-9a-f-]{36}", cursor)):
+                    return None
+                if valid_population(result) and len(result["points"]) <= 250:
+                    return {**result, "next": cursor}
+                return None
             result = await self.request("GET", "/ml/population-map")
             if valid_population(result):
                 return result

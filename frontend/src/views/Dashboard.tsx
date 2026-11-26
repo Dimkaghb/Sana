@@ -1,6 +1,33 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Label } from "../components/ui/label";
+import { Checkbox } from "../components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../components/ui/collapsible";
+import { Card } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "../components/ui/native-select";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
+import { useCallback, useEffect, useState } from "react";
 import {
   Activity,
+  UsersRound,
+  ChevronRight,
+  LogOut,
   ArrowDownToLine,
   ArrowRight,
   ArrowUpRight,
@@ -9,7 +36,7 @@ import {
   Coins,
   Fingerprint,
   Layers3,
-  LayoutDashboard,
+  ListFilter,
   LockKeyhole,
   Monitor,
   Network,
@@ -20,6 +47,10 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { AccountDirectory } from "../components/AccountDirectory";
+import { ActivityChart, Signals } from "../components/Signals";
+import { Theme } from "../components/Theme";
+import { signOut } from "../components/WorkspaceAccess";
 import { Brand } from "../components/Brand";
 import {
   PopulationMap,
@@ -34,7 +65,12 @@ import {
   type DashboardEvent,
 } from "../types";
 
-function useFeed(preview: boolean) {
+function useFeed(
+  preview: boolean,
+  map: boolean,
+  account: string,
+  cursor: string,
+) {
   const [data, setData] = useState<DashboardData>();
   const [status, setStatus] = useState("Connecting");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -52,7 +88,10 @@ function useFeed(preview: boolean) {
     async function load() {
       const id = ++generation;
       try {
-        const response = await fetch("/api/v1/dashboard/init", {
+        const params = new URLSearchParams({ include_map: String(map) });
+        if (map) params.set("map_page", cursor);
+        if (account) params.set("account", account);
+        const response = await fetch("/api/v1/dashboard/init?" + params, {
           signal: controller.signal,
         });
         if (!response.ok) throw Error();
@@ -78,7 +117,10 @@ function useFeed(preview: boolean) {
       socket.onmessage = ({ data: raw }) => {
         try {
           const update = JSON.parse(raw);
-          if (update.type === "SESSION_SCORED") {
+          if (
+            update.type === "SESSION_SCORED" &&
+            (!account || update.account_id === account)
+          ) {
             ++generation;
             setData(
               (previous) =>
@@ -109,6 +151,7 @@ function useFeed(preview: boolean) {
         }
       };
     }
+    setData(undefined);
     void load();
     connect();
     return () => {
@@ -120,7 +163,7 @@ function useFeed(preview: boolean) {
         socket.close();
       }
     };
-  }, [preview, refreshKey]);
+  }, [preview, refreshKey, map, account, cursor]);
   return { data: preview ? fixtureData : data, status, refresh };
 }
 const time = (s: string) =>
@@ -129,11 +172,29 @@ const time = (s: string) =>
     minute: "2-digit",
     second: "2-digit",
   });
-export function Dashboard() {
-  const [preview, setPreview] = useState(
-    new URLSearchParams(location.search).get("mode") === "fixtures",
+export function Dashboard({ alias }: { alias?: string }) {
+  const preview =
+    new URLSearchParams(location.search).get("mode") === "fixtures";
+  const views = [
+    ["queue", "Transfer review", ListFilter],
+    ["map", "Population map", Network],
+    ["signals", "Signal windows", Activity],
+    ["accounts", "Accounts", UsersRound],
+  ] as const;
+  const view =
+    views.find(([path]) => path === location.pathname.split("/")[2])?.[0] ||
+    "queue";
+  const [accountFilter, setAccountFilter] = useState(
+    new URLSearchParams(location.search).get("account") || "",
   );
-  const { data, status, refresh } = useFeed(preview);
+
+  const [pages, setPages] = useState(["first"]);
+  const { data, status, refresh } = useFeed(
+    preview,
+    view === "map",
+    accountFilter,
+    pages.at(-1)!,
+  );
   const [selected, setSelected] = useState<string>();
   const [dot, setDot] = useState<SelectedDot>();
   const [token, setToken] = useState("");
@@ -144,8 +205,17 @@ export function Dashboard() {
   const [dossier, setDossier] = useState<Record<string, unknown>>();
   const [range, setRange] = useState("all");
   const [credentials, setCredentials] = useState(false);
-  const events = data?.events || [],
-    current = events.find((e) => e.session_id === selected) || events[0];
+
+  const events = data?.events || [];
+  const priority = { MIRAGE_HOLD: 0, STEP_UP_LIVENESS: 1, SUCCESS: 2 };
+  const visible = events
+    .filter(
+      (e) =>
+        (!accountFilter || e.account_id === accountFilter) &&
+        (range === "all" || e.decision === range),
+    )
+    .sort((a, b) => priority[a.decision] - priority[b.decision]);
+  const current = visible.find((e) => e.session_id === selected) || visible[0];
   const active = data?.active_sessions || [];
   const liveTarget = active.includes(target) ? target : active[0];
   const selectedEvent = events.find((e) => e.session_id === dot?.session_id);
@@ -184,11 +254,6 @@ export function Dashboard() {
         ]),
       )
     : [];
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    if (dot || credentials) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [dot, credentials]);
   function close() {
     setCredentials(false);
     setDot(undefined);
@@ -196,7 +261,7 @@ export function Dashboard() {
     setOwnerVerified(false);
   }
   async function action(endpoint: string, body?: unknown, download = false) {
-    if (!token) {
+    if (!token && !alias) {
       setNotice("Enter an analyst access token to continue.");
       setCredentials(true);
       return;
@@ -207,7 +272,7 @@ export function Dashboard() {
       const res = await fetch(endpoint, {
         method: download ? "GET" : "POST",
         headers: {
-          Authorization: "Bearer " + token,
+          ...(token ? { Authorization: "Bearer " + token } : {}),
           ...(body ? { "Content-Type": "application/json" } : {}),
         },
         body: body ? JSON.stringify(body) : undefined,
@@ -291,276 +356,413 @@ export function Dashboard() {
   ];
   return (
     <div className="console">
-      <header className="topbar">
-        <a href="/dashboard">
+      <aside className="workrail">
+        <a className="rail-brand" href={"/dashboard" + location.search}>
           <Brand />
         </a>
+        <nav aria-label="Investigation views">
+          {views.map(([path, title, Icon]) => (
+            <Button
+              key={path}
+              aria-pressed={view === path}
+              onClick={() => {
+                const url = new URL(location.href);
+                url.pathname =
+                  path === "queue" ? "/dashboard" : "/dashboard/" + path;
+                url.searchParams.delete("account");
+                location.assign(url);
+              }}
+            >
+              <Icon size={17} />
+              {title}
+            </Button>
+          ))}
+        </nav>
+        <div className="rail-foot">
+          <Fingerprint />
+          <span>Identity workspace</span>
+        </div>
+      </aside>
+      <header className="topbar">
+        <div className="crumb">
+          Workspace <ChevronRight size={14} />{" "}
+          <b>{views.find((v) => v[0] === view)?.[1]}</b>
+        </div>
         <div className="env">
           <i />
           {preview ? "Fixture preview" : status}
         </div>
         <div className="toplinks">
-          <a href="/mobile">
+          <Theme />
+          <a href={preview ? "/mobile?mode=fixtures" : "/mobile"}>
             <Smartphone size={16} /> Mobile
           </a>
           <a href="/guardian">
             <ShieldCheck size={16} /> Guardian
           </a>
-          <button
-            onClick={() => {
-              setCredentials(true);
-              setNotice("");
-            }}
-          >
-            <LockKeyhole size={16} />
-            <span>Analyst access</span>
-          </button>
+          {alias ? (
+            <Button
+              onClick={() =>
+                signOut("analyst").catch(() =>
+                  setNotice("Sign-out failed. Try again."),
+                )
+              }
+            >
+              <LogOut size={16} />
+              {alias}
+            </Button>
+          ) : (
+            <Button
+              onClick={() => {
+                setCredentials(true);
+                setNotice("");
+              }}
+            >
+              <LockKeyhole size={16} />
+              <span>Analyst access</span>
+            </Button>
+          )}
         </div>
       </header>
       <main className="desk">
         <div className="overview">
           <div>
-            <p className="eyebrow">
-              <LayoutDashboard size={13} /> BCC ANTI-FRAUD OPERATIONS
-            </p>
             <h1>
-              Command center<span>.</span>
+              {view === "queue"
+                ? "Transfer operations"
+                : view === "map"
+                  ? "Population map"
+                  : view === "signals"
+                    ? "Signal windows"
+                    : "Account directory"}
             </h1>
           </div>
-          <label className="source">
+          <Label className="source">
             <Layers3 size={15} />
-            <select
+            <NativeSelect
               aria-label="Data source"
               value={preview ? "fixtures" : "live"}
               onChange={(e) => {
-                setPreview(e.target.value === "fixtures");
-                setSelected(undefined);
-                setNotice("");
+                const url = new URL(location.href);
+                if (e.target.value === "fixtures")
+                  url.searchParams.set("mode", "fixtures");
+                else url.searchParams.delete("mode");
+                location.assign(url);
               }}
             >
-              <option value="live">Service feed</option>
-              <option value="fixtures">Fixture preview</option>
-            </select>
-          </label>
+              <NativeSelectOption value="live">Service feed</NativeSelectOption>
+              <NativeSelectOption value="fixtures">
+                Fixture preview
+              </NativeSelectOption>
+            </NativeSelect>
+          </Label>
         </div>
-        <div className="metrics">
-          {metrics.map(({ icon: Icon, label, value, unit, sub, color }) => (
-            <div className="metric" key={label}>
-              <div>
-                <span>{label}</span>
-                <i className={color}>
-                  <Icon size={17} />
-                </i>
-              </div>
-              <strong>
-                {value == null ? "—" : money(value)} <small>{unit}</small>
-              </strong>
-              <footer>{sub}</footer>
-            </div>
-          ))}
-        </div>
-        <div className="analysis-grid">
-          <PopulationMap
-            data={data}
-            selected={selected}
-            onSelect={(d) => {
-              setDot(d);
-              setSelected(d.session_id);
-            }}
-          />
-          <section className="panel signal">
-            <header className="panel-head">
-              <div>
-                <p className="eyebrow">SESSION TELEMETRY</p>
-                <h2>Signal inspection</h2>
-              </div>
-              <Activity size={20} />
-            </header>
-            <div className="signal-body">
-              <div className="score-head">
-                <span>Risk score</span>
+        {view === "queue" && (
+          <div className="metrics">
+            {metrics.map(({ icon: Icon, label, value, unit, sub, color }) => (
+              <Card className="metric" key={label}>
+                <div>
+                  <span>{label}</span>
+                  <i className={color}>
+                    <Icon size={17} />
+                  </i>
+                </div>
                 <strong>
-                  {current?.overall_risk_score ?? "—"}
-                  <small>/100</small>
+                  {value == null ? "—" : money(value)} <small>{unit}</small>
                 </strong>
+                <footer>{sub}</footer>
+              </Card>
+            ))}
+          </div>
+        )}
+        {view === "queue" && <ActivityChart events={events} />}
+        {view === "map" ? (
+          <>
+            <PopulationMap
+              data={data}
+              selected={selected}
+              onSelect={(d) => {
+                setDot(d);
+                setSelected(d.session_id);
+              }}
+            />
+            {data &&
+              !preview &&
+              data.ml_mode === "live" &&
+              !data.population_map && (
+                <p role="status">
+                  Population service unavailable. Showing recent scored
+                  transfers.
+                </p>
+              )}
+            {(pages.length > 1 || data?.population_map?.next) && (
+              <div className="page-buttons">
+                <Button
+                  disabled={pages.length === 1}
+                  onClick={() => setPages((p) => p.slice(0, -1))}
+                >
+                  Previous points
+                </Button>
+                <span>Page {pages.length}</span>
+                <Button
+                  disabled={!data?.population_map?.next}
+                  onClick={() =>
+                    setPages((p) => [...p, data!.population_map!.next!])
+                  }
+                >
+                  Next points
+                </Button>
               </div>
-              {(
-                [
-                  ["anti_rat_physics_risk", "Touch physics"],
-                  ["coercion_stress_risk", "Coercion signals"],
-                  ["operator_mismatch_risk", "Operator mismatch"],
-                ] as const
-              ).map(([key, label]) => {
-                const score = current?.scores[key];
-                return (
-                  <div className="bar" key={key}>
-                    <div>
-                      <span>{label}</span>
-                      <b>{score ?? "Unavailable"}</b>
+            )}
+          </>
+        ) : view === "signals" ? (
+          <Signals events={events} preview={preview} />
+        ) : view === "accounts" ? (
+          <AccountDirectory events={events} preview={preview} />
+        ) : (
+          <div className="analysis-grid review-grid">
+            {" "}
+            <section className="panel ledger">
+              <header className="panel-head">
+                <div>
+                  <h2>Transfer queue</h2>
+                  {accountFilter && (
+                    <Button
+                      onClick={() => {
+                        setAccountFilter("");
+                        const url = new URL(location.href);
+                        url.searchParams.delete("account");
+                        history.replaceState(null, "", url);
+                      }}
+                    >
+                      {accountFilter} ×
+                    </Button>
+                  )}
+                </div>
+                <NativeSelect
+                  aria-label="Filter decisions"
+                  value={range}
+                  onChange={(e) => setRange(e.target.value)}
+                >
+                  <NativeSelectOption value="all">
+                    All decisions
+                  </NativeSelectOption>
+                  {Object.entries(decisionLabel).map(([k, v]) => (
+                    <NativeSelectOption key={k} value={k}>
+                      {v}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </header>
+              <div className="table-scroll">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Time · local</TableHead>
+                      <TableHead>Account</TableHead>
+
+                      <TableHead>Risk</TableHead>
+                      <TableHead>Decision</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visible.map((e) => (
+                      <TableRow
+                        key={e.session_id}
+                        className={
+                          current?.session_id === e.session_id ? "chosen" : ""
+                        }
+                      >
+                        <TableCell>{time(e.timestamp)}</TableCell>
+                        <TableCell>
+                          <Button
+                            className="case-select"
+                            aria-pressed={current?.session_id === e.session_id}
+                            onClick={() => setSelected(e.session_id)}
+                          >
+                            {e.account_label}
+                            <small>
+                              {e.flags.find((f) => f.severity !== "INFO")
+                                ?.title || e.session_id}
+                            </small>
+                          </Button>
+                        </TableCell>
+
+                        <TableCell>{e.overall_risk_score ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge className={"badge " + e.decision}>
+                            {decisionLabel[e.decision]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            aria-label={"Inspect " + e.session_id}
+                            onClick={() => inspect(e)}
+                          >
+                            <ArrowUpRight size={16} />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {!visible.length && (
+                <div className="empty-row">
+                  <CircleDot size={17} /> No matching sessions
+                </div>
+              )}
+            </section>
+            <section className="panel signal">
+              <header className="panel-head">
+                <div>
+                  <h2>Transfer evidence</h2>
+                  <p className="case-name">
+                    {current?.account_label || "No transfer selected"}
+                  </p>
+                </div>
+                <Activity size={20} />
+              </header>
+              <div className="signal-body">
+                <div className="score-head">
+                  <span>Risk score</span>
+                  <strong>
+                    {current?.overall_risk_score ?? "—"}
+                    <small>/100</small>
+                  </strong>
+                </div>
+                {(
+                  [
+                    ["anti_rat_physics_risk", "Touch physics"],
+                    ["coercion_stress_risk", "Coercion signals"],
+                    ["operator_mismatch_risk", "Operator mismatch"],
+                  ] as const
+                ).map(([key, label]) => {
+                  const score = current?.scores[key];
+                  return (
+                    <div className="bar" key={key}>
+                      <div>
+                        <span>{label}</span>
+                        <b>{score ?? "Unavailable"}</b>
+                      </div>
+                      <i>
+                        <b
+                          style={{
+                            width: (score ?? 0) + "%",
+                            background:
+                              score != null && score >= 75
+                                ? "var(--critical)"
+                                : score != null && score >= 50
+                                  ? "var(--warning)"
+                                  : undefined,
+                          }}
+                        />
+                      </i>
                     </div>
-                    <i>
-                      <b
-                        style={{
-                          width: (score ?? 0) + "%",
-                          background:
-                            score != null && score >= 75
-                              ? "#f48c76"
-                              : score != null && score >= 50
-                                ? "#f0ba71"
-                                : undefined,
-                        }}
-                      />
-                    </i>
-                  </div>
-                );
-              })}
-              <Waveform event={current} />
-            </div>
-          </section>
-        </div>
-        <section className="panel ledger">
-          <header className="panel-head">
-            <div>
-              <p className="eyebrow">DECISION HISTORY</p>
-              <h2>Session ledger</h2>
-            </div>
-            <select
-              aria-label="Filter decisions"
-              value={range}
-              onChange={(e) => setRange(e.target.value)}
-            >
-              <option value="all">All decisions</option>
-              {Object.entries(decisionLabel).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </header>
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Time · local</th>
-                  <th>Account</th>
-                  <th>Operator</th>
-                  <th>Risk</th>
-                  <th>Decision</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
+                  );
+                })}
+                <Waveform event={current} />
+                {current && (
+                  <>
+                    <div className="evidence-operator">
+                      <span>Matched operator</span>
+                      <code>
+                        {current.map_point?.operator_id || "Unavailable"}
+                      </code>
+                    </div>
+                    <Button
+                      className="dossier-link"
+                      onClick={() => inspect(current)}
+                    >
+                      Open dossier <ArrowUpRight size={15} />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+        {view === "queue" &&
+          events.some((e) => e.flags.some((f) => f.severity !== "INFO")) && (
+            <section className="panel alerts">
+              <header className="panel-head">
+                <div>
+                  <h2>Recent alerts</h2>
+                </div>
+                <Radio size={19} />
+              </header>
+              <div>
                 {events
-                  .filter((e) => range === "all" || e.decision === range)
-                  .map((e) => (
-                    <tr key={e.session_id}>
-                      <td>{time(e.timestamp)}</td>
-                      <td>{e.account_label}</td>
-                      <td className="mono">
-                        {e.map_point?.operator_id || "Unavailable"}
-                      </td>
-                      <td>{e.overall_risk_score ?? "—"}</td>
-                      <td>
-                        <span className={"badge " + e.decision}>
-                          {decisionLabel[e.decision]}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          aria-label={"Inspect " + e.session_id}
+                  .flatMap((e) =>
+                    e.flags
+                      .filter((f) => f.severity !== "INFO")
+                      .map((f) => (
+                        <Button
+                          key={e.session_id + f.code}
                           onClick={() => inspect(e)}
                         >
-                          <ArrowUpRight size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-          {!events.filter((e) => range === "all" || e.decision === range)
-            .length && (
-            <div className="empty-row">
-              <CircleDot size={17} /> No matching sessions
-            </div>
-          )}
-        </section>
-        {events.some((e) => e.flags.some((f) => f.severity !== "INFO")) && (
-          <section className="panel alerts">
-            <header className="panel-head">
-              <div>
-                <p className="eyebrow">FLAGGED EVIDENCE</p>
-                <h2>Recent alerts</h2>
+                          <span className="alert-mark" />
+                          <span>
+                            <strong>{f.title}</strong>
+                            <small>
+                              {e.account_label} · {time(e.timestamp)}
+                            </small>
+                          </span>
+                          <ArrowUpRight size={14} />
+                        </Button>
+                      )),
+                  )
+                  .slice(0, 6)}
               </div>
-              <Radio size={19} />
-            </header>
-            <div>
-              {events
-                .flatMap((e) =>
-                  e.flags
-                    .filter((f) => f.severity !== "INFO")
-                    .map((f) => (
-                      <button
-                        key={e.session_id + f.code}
-                        onClick={() => inspect(e)}
-                      >
-                        <span className="alert-mark" />
-                        <span>
-                          <strong>{f.title}</strong>
-                          <small>
-                            {e.account_label} · {time(e.timestamp)}
-                          </small>
-                        </span>
-                        <ArrowUpRight size={14} />
-                      </button>
-                    )),
-                )
-                .slice(0, 6)}
-            </div>
+            </section>
+          )}
+        {view === "queue" && (
+          <section className="toolbar">
+            <span>
+              <Monitor size={17} /> Demo controls
+            </span>
+            <a href={preview ? "/guardian?mode=fixtures" : "/guardian"}>
+              {preview ? "Preview Guardian" : "Open Guardian"}
+            </a>
+            {preview && (
+              <Button
+                onClick={() => {
+                  setRange("all");
+                  setSelected(undefined);
+                  close();
+                  setNotice("Fixture preview reset.");
+                }}
+              >
+                Reset preview
+              </Button>
+            )}
+            <NativeSelect
+              aria-label="Active mobile session"
+              value={liveTarget || ""}
+              onChange={(e) => setTarget(e.target.value)}
+            >
+              {!active.length && (
+                <NativeSelectOption value="">
+                  No mobile session connected
+                </NativeSelectOption>
+              )}
+              {active.map((s) => (
+                <NativeSelectOption key={s}>{s}</NativeSelectOption>
+              ))}
+            </NativeSelect>
+            <Button
+              disabled={preview || working || !liveTarget}
+              onClick={() =>
+                void action("/api/v1/demo/inject-rat-click", {
+                  session_id: liveTarget,
+                })
+              }
+            >
+              <Zap size={15} /> Simulate remote click
+            </Button>
           </section>
         )}
-        <section className="toolbar">
-          <span>
-            <Monitor size={17} /> Demo controls
-          </span>
-          <a href={preview ? "/guardian?mode=fixtures" : "/guardian"}>
-            {preview ? "Preview Guardian" : "Open Guardian"}
-          </a>
-          {preview && (
-            <button
-              onClick={() => {
-                setRange("all");
-                setSelected(undefined);
-                close();
-                setNotice("Fixture preview reset.");
-              }}
-            >
-              Reset preview
-            </button>
-          )}
-          <select
-            aria-label="Active mobile session"
-            value={liveTarget || ""}
-            onChange={(e) => setTarget(e.target.value)}
-          >
-            {!active.length && (
-              <option value="">No mobile session connected</option>
-            )}
-            {active.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-          <button
-            disabled={preview || working || !liveTarget}
-            onClick={() =>
-              void action("/api/v1/demo/inject-rat-click", {
-                session_id: liveTarget,
-              })
-            }
-          >
-            <Zap size={15} /> Simulate remote click
-          </button>
-        </section>
         {notice && (
           <p role="status" className="notice">
             {notice}
@@ -579,154 +781,174 @@ export function Dashboard() {
           </span>
         </footer>
       </main>
-      <dialog ref={dialog} onCancel={close} onClose={close}>
-        <button className="dialog-close" onClick={close} aria-label="Close">
-          <X size={20} />
-        </button>
-        {credentials ? (
-          <>
-            <LockKeyhole className="dialog-symbol" />
-            <h2>Analyst access</h2>
-            <p>Enter the demo operator token for this tab.</p>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                close();
-                setNotice("Analyst token saved for this tab.");
-              }}
-            >
-              <input
-                type="password"
-                autoComplete="off"
-                aria-label="Analyst token"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-              />
-              <button className="primary">
-                Continue <ArrowRight size={16} />
-              </button>
-            </form>
-          </>
-        ) : (
-          dot && (
+      <Dialog
+        open={!!dot || credentials}
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
+      >
+        <DialogContent
+          className="dossier-dialog"
+          showCloseButton={false}
+          aria-describedby={undefined}
+        >
+          <Button className="dialog-close" onClick={close} aria-label="Close">
+            <X size={20} />
+          </Button>
+          {credentials ? (
             <>
-              <Fingerprint className="dialog-symbol" />
-              <p className="eyebrow">OPERATOR DOSSIER</p>
-              <h2>{dot.operator_id || "Session evidence"}</h2>
-              <p className="mono">{dot.account_id}</p>
-              {dot.synthetic && <p>Synthetic seed session</p>}
-              {(dot.status === "BANNED" || dot.status === "UNVERIFIED") && (
-                <p>Operator status · {dot.status.toLowerCase()}</p>
-              )}
-              {dot.operator_id && (
-                <div className="flag">
-                  <b>{linked ? "Linked accounts" : "Accounts in view"}</b>
-                  <p>
-                    {(linked || visibleAccounts).join(" · ") || "Unavailable"}
-                  </p>
-                  {confidence != null && (
+              <LockKeyhole className="dialog-symbol" />
+              <DialogTitle>Analyst access</DialogTitle>
+              <p>Enter the demo operator token for this tab.</p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  close();
+                  setNotice("Analyst token saved for this tab.");
+                }}
+              >
+                <Input
+                  type="password"
+                  autoComplete="off"
+                  aria-label="Analyst token"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                />
+                <Button className="primary">
+                  Continue <ArrowRight size={16} />
+                </Button>
+              </form>
+            </>
+          ) : (
+            dot && (
+              <>
+                <Fingerprint className="dialog-symbol" />
+                <p className="eyebrow">OPERATOR DOSSIER</p>
+                <DialogTitle>
+                  {dot.operator_id || "Session evidence"}
+                </DialogTitle>
+                <p className="mono">{dot.account_id}</p>
+                {dot.synthetic && <p>Synthetic seed session</p>}
+                {(dot.status === "BANNED" || dot.status === "UNVERIFIED") && (
+                  <p>Operator status · {dot.status.toLowerCase()}</p>
+                )}
+                {dot.operator_id && (
+                  <div className="flag">
+                    <b>{linked ? "Linked accounts" : "Accounts in view"}</b>
                     <p>
-                      {preview || data?.ml_mode === "mock"
-                        ? "Fixture match"
-                        : "Operator match"}{" "}
-                      · {Math.round(confidence * 100)}%
+                      {(linked || visibleAccounts).join(" · ") || "Unavailable"}
                     </p>
-                  )}
-                </div>
-              )}
-              {selectedEvent?.flags.map((f) => (
-                <div className="flag" key={f.code}>
-                  <b>{f.title}</b>
-                  <p>{f.detail}</p>
-                </div>
-              ))}
-              {!selectedEvent?.flags.length && (
-                <p>No session flags available.</p>
-              )}
-              <div className="dialog-actions">
-                <button
-                  disabled={preview || working || !dot.operator_id}
-                  onClick={() =>
-                    void action(
-                      "/api/v1/operators/" +
-                        encodeURIComponent(dot.operator_id!) +
-                        "/ban",
-                    )
-                  }
-                >
-                  <Ban size={16} /> Ban operator
-                </button>
-                <button
-                  disabled={preview || working || !selectedEvent}
-                  onClick={() =>
-                    void action(
-                      "/api/v1/cases/" +
-                        encodeURIComponent(selectedEvent!.session_id) +
-                        "/export-antifraud",
-                      undefined,
-                      true,
-                    )
-                  }
-                >
-                  <ArrowDownToLine size={16} /> Preview dossier
-                </button>
-              </div>
-              {canEnroll && (
-                <div className="enrollment">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={ownerVerified}
-                      onChange={(e) => setOwnerVerified(e.target.checked)}
-                    />{" "}
-                    I independently verified this account owner for this
-                    session.
-                  </label>
-                  <button
-                    className="primary"
-                    disabled={working || !ownerVerified}
+                    {confidence != null && (
+                      <p>
+                        {preview || data?.ml_mode === "mock"
+                          ? "Fixture match"
+                          : "Operator match"}{" "}
+                        · {Math.round(confidence * 100)}%
+                      </p>
+                    )}
+                  </div>
+                )}
+                {selectedEvent?.flags.map((f) => (
+                  <div className="flag" key={f.code}>
+                    <b>{f.title}</b>
+                    <p>{f.detail}</p>
+                  </div>
+                ))}
+                {!selectedEvent?.flags.length && (
+                  <p>No session flags available.</p>
+                )}
+                <div className="dialog-actions">
+                  <Button
+                    disabled={preview || working || !dot.operator_id}
                     onClick={() =>
                       void action(
-                        "/api/v1/sessions/" +
-                          encodeURIComponent(selectedEvent!.session_id) +
-                          "/enroll",
-                        { owner_verified: true },
+                        "/api/v1/operators/" +
+                          encodeURIComponent(dot.operator_id!) +
+                          "/ban",
                       )
                     }
                   >
-                    Enroll verified session
-                  </button>
-                </div>
-              )}
-              {dossier && (
-                <details open className="export-preview">
-                  <summary>Case export preview</summary>
-                  <pre>{JSON.stringify(dossier, null, 2)}</pre>
-                  <button
-                    className="primary"
-                    onClick={() => {
-                      const url = URL.createObjectURL(
-                        new Blob([JSON.stringify(dossier, null, 2)], {
-                          type: "application/json",
-                        }),
-                      );
-                      const link = document.createElement("a");
-                      link.href = url;
-                      link.download =
-                        "sana-case-" + (dossier.case_id || "demo") + ".json";
-                      link.click();
-                      setTimeout(() => URL.revokeObjectURL(url), 1000);
-                    }}
+                    <Ban size={16} /> Ban operator
+                  </Button>
+                  <Button
+                    disabled={preview || working || !selectedEvent}
+                    onClick={() =>
+                      void action(
+                        "/api/v1/cases/" +
+                          encodeURIComponent(selectedEvent!.session_id) +
+                          "/export-antifraud",
+                        undefined,
+                        true,
+                      )
+                    }
                   >
-                    Download JSON <ArrowDownToLine size={16} />
-                  </button>
-                </details>
-              )}
-              {notice && <p role="status">{notice}</p>}
-            </>
-          )
-        )}
-      </dialog>
+                    <ArrowDownToLine size={16} /> Preview dossier
+                  </Button>
+                </div>
+                {canEnroll && (
+                  <div className="enrollment">
+                    <Label>
+                      <Checkbox
+                        checked={ownerVerified}
+                        onCheckedChange={(value) =>
+                          setOwnerVerified(value === true)
+                        }
+                      />{" "}
+                      I independently verified this account owner for this
+                      session.
+                    </Label>
+                    <Button
+                      className="primary"
+                      disabled={working || !ownerVerified}
+                      onClick={() =>
+                        void action(
+                          "/api/v1/sessions/" +
+                            encodeURIComponent(selectedEvent!.session_id) +
+                            "/enroll",
+                          { owner_verified: true },
+                        )
+                      }
+                    >
+                      Enroll verified session
+                    </Button>
+                  </div>
+                )}
+                {dossier && (
+                  <Collapsible defaultOpen className="export-preview">
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost">Case export preview</Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <pre>{JSON.stringify(dossier, null, 2)}</pre>
+                      <Button
+                        className="primary"
+                        onClick={() => {
+                          const url = URL.createObjectURL(
+                            new Blob([JSON.stringify(dossier, null, 2)], {
+                              type: "application/json",
+                            }),
+                          );
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download =
+                            "sana-case-" +
+                            (dossier.case_id || "demo") +
+                            ".json";
+                          link.click();
+                          setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        }}
+                      >
+                        Download JSON <ArrowDownToLine size={16} />
+                      </Button>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+                {notice && <p role="status">{notice}</p>}
+              </>
+            )
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

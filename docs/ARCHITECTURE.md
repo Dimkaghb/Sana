@@ -8,6 +8,7 @@ flowchart TD
     SDK -->|Contract A / HTTPS| API[Person Two: FastAPI]
     API --> PHY[Physics and coercion]
     API -->|Contract A / HTTP| ML[Person Three: ML port 8001]
+    ML -->|Windowed 128-D embedding| Q[(Qdrant)]
     ML -->|Contract B| API
     PHY --> FUSION[Risk fusion]
     API --> FUSION
@@ -22,7 +23,7 @@ Run one backend worker with an in-memory connection registry and SQLite. Shared 
 
 ## Sequence
 
-1. A UI callback activates sensors; the SDK starts a session and bounded buffers.
+1. The mobile account signs in. A UI callback activates sensors; the SDK starts a session and bounded buffers.
 2. At transfer confirmation, serialize permitted measurements as Contract A.
 3. Validate and check duplicate submission before invoking side effects.
 4. Run physics/coercion and request ML evidence.

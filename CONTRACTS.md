@@ -99,3 +99,11 @@ Contract A keeps the original complete measurement records. Omit incomplete obse
 Synthetic IMU/key timings are constructed examples. Fixture embeddings, scores and map points are hand-authored illustrations. Evaluate algorithm performance separately.
 
 Run `python scripts/validate_contracts.py` and `python -m unittest discover -s tests -v` from the repo root in the configured environment.
+
+## Contact observations and window features
+
+Contract A 1.1 adds the optional `contacts` array. A 1.0 sender can continue omitting it. A strict 1.0 receiver rejects the new field, so upgrade backend and ML validators before rolling out the SDK. The synthetic normal fixture includes paired contacts. Each record contains session-relative down/up times, browser pointer type, trust provenance and one whitelisted field category. The category distinguishes recipient, amount, recipient type, preset, details review and confirmation slider interactions. Actual keypad digits and recipient values never enter this stream. Dropped, canceled or unpaired contacts do not yield durations. The stream is ordered by down time and limited to 512 records.
+
+Window version 1 uses 2,000 ms half-open intervals anchored to session start every 1,000 ms. It retains the final 64 window starts and clips displayed ends to the observed duration. Durations contribute only when both ends fall inside the window. Channel values are clipped to [0, 1] before averaging. Key and contact dwell use a 1,000 ms reference, key interval uses 2,000 ms, acceleration magnitude uses 9.80665 m/s² and slider travel uses one normalized viewport unit per second. Slider speed omits gaps above 150 ms. Pressure uses browser units. Null means no eligible observations in the interval. These are fixed feature scales, independent of risk thresholds. Older dossiers can lack window evidence. The exported dossier contains derived windows. Raw recording still requires calibration consent.
+
+Live browser ingestion and calibration require a mobile login matching A's account ID. Analyst session cookies authorize dashboard HTTP and WebSocket access. A stored login alias identifies the account. The matched operator ID identifies a behavioral similarity hypothesis and can link multiple aliases. Contract B–D shapes are unchanged.

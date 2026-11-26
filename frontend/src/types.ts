@@ -42,6 +42,7 @@ export interface DashboardData {
       synthetic?: boolean;
     })[];
     clusters: unknown[];
+    next?: string | null;
   } | null;
   kpis: {
     sessions: number;

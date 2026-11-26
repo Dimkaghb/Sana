@@ -1,4 +1,6 @@
 """Start a fresh, local rehearsal using the installed environments and built web app."""
+import sqlite3
+from backend import accounts as login_accounts
 import argparse
 from contextlib import ExitStack
 import json
@@ -67,11 +69,17 @@ def main():
     accounts = ("acc_student_101", "acc_victim_409", "acc_drop_772")
     guardians = {name: secrets.token_urlsafe(24) for name in accounts}
     analyst = secrets.token_urlsafe(24)
+    db_path = run / "sessions.sqlite"
+    passwords = {alias: secrets.token_urlsafe(16) for alias in (*accounts, "analyst")}
+    with sqlite3.connect(db_path) as db:
+        login_accounts.initialize(db)
+        for alias, password in passwords.items():
+            login_accounts.provision(db, alias, password, "analyst" if alias == "analyst" else "mobile")
     credentials = run / "access.json"
     with os.fdopen(
         os.open(credentials, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), "w"
     ) as f:
-        json.dump({"analyst": analyst, "guardians": guardians}, f, indent=2)
+        json.dump({"logins": passwords, "analyst": analyst, "guardians": guardians}, f, indent=2)
 
     origin = f"http://127.0.0.1:{args.port}"
     identity = f"http://127.0.0.1:{args.ml_port}"
@@ -82,7 +90,7 @@ def main():
     # A fresh local rehearsal uses only its own identity store and synthetic model.
     for inherited in ("ML_QDRANT_URL", "ML_QDRANT_API_KEY", "ML_CALIBRATION_MANIFEST", "SANA_CALIBRATION_DIR"):
         env.pop(inherited, None)
-    env["ML_MODEL_DIR"] = str(ROOT / "ml/artifacts/synthetic-v1")
+    env["ML_MODEL_DIR"] = str(ROOT / "ml/artifacts/synthetic-v2")
     env["ML_SEED_POPULATION"] = "1"
 
     def terminate(signum, frame):

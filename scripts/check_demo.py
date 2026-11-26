@@ -18,6 +18,15 @@ from websockets.asyncio.client import connect
 from scripts.validate_contracts import FIXTURES, ROOT, load_json, validate_payload, validators
 
 
+def fixture_app():
+    """Legacy fixture protocol, served only by this isolated loopback test."""
+    from dataclasses import replace
+    from backend.config import Settings
+    from backend.main import create_app
+
+    return create_app(replace(Settings.from_env(), fixture_access=True))
+
+
 @asynccontextmanager
 async def server(directory, *, mode="mock", ml_url="http://127.0.0.1:8001", ml_token=""):
     # Hand the bound socket directly to Uvicorn, keeping the port reserved.
@@ -36,7 +45,7 @@ async def server(directory, *, mode="mock", ml_url="http://127.0.0.1:8001", ml_t
                     "SANA_CALIBRATION_DIR"):
             env.pop(key, None)
         child = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "backend.main:app", "--fd", str(listener.fileno()),
+            [sys.executable, "-m", "uvicorn", "scripts.check_demo:fixture_app", "--factory", "--fd", str(listener.fileno()),
              "--log-level", "warning", "--no-access-log"],
             pass_fds=(listener.fileno(),), env=env, cwd=ROOT,
         )

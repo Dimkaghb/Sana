@@ -64,3 +64,9 @@ backend/.venv/bin/python -m unittest discover -s tests -v
 ```
 
 `GET /health` reports process availability. `GET /ready` checks local storage and returns the configured identity mode. Dashboard initialization reports a null population map when the live identity service is unavailable.
+
+## Workspace access
+
+Provision fictional aliases interactively with `python -m backend.accounts mobile <alias>` and `python -m backend.accounts analyst <alias>` using the service's `SANA_DB`. Login verifies a salted scrypt hash and issues a separate HttpOnly, SameSite=Strict cookie per role. HTTPS is required outside loopback. Session tokens expire after eight hours and logout revokes them. The analyst bearer remains available for scripted administration. Rehearsal generates distinct local credentials for each role. The isolated loopback test harness injects fixture access through its own ASGI factory. Normal service startup always requires logins.
+
+The mobile history route returns the signed-in account’s 50 latest simulated receipts. Analyst directory queries use alias prefixes and keyset pagination with 50 accounts per page. Dashboard init accepts an account filter and `include_map=false` for queue, directory and signal views. The map requests `map_page=first`, then an opaque continuation cursor. The legacy init shape remains available for existing clients. Recent session lists contain up to 200 events and KPIs cover the whole database.

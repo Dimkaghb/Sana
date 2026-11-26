@@ -29,6 +29,36 @@ class Store:
             );
         """)
 
+        self.db.executescript("""
+            CREATE TABLE IF NOT EXISTS dashboard_totals (
+                id INTEGER PRIMARY KEY CHECK(id=1), sessions INTEGER NOT NULL,
+                held_amount REAL NOT NULL, inference_sum REAL NOT NULL, inference_count INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS observed_rings (operator TEXT PRIMARY KEY);
+        """)
+        # Existing decisions are append-only. Backfill once, then maintain totals
+        # in the same transaction as each new session, including older writers.
+        with self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            if not self.db.execute(
+                "SELECT 1 FROM dashboard_totals WHERE id=1"
+            ).fetchone():
+                self.db.execute("""INSERT INTO dashboard_totals
+                    SELECT 1, COUNT(*), COALESCE(SUM(CASE WHEN json_extract(decision,'$.ui_mode')='MIRAGE_HOLD'
+                    THEN amount ELSE 0 END),0), COALESCE(SUM(inference),0), COUNT(inference) FROM sessions""")
+                self.db.execute(
+                    "INSERT OR IGNORE INTO observed_rings SELECT DISTINCT ring FROM sessions WHERE ring IS NOT NULL"
+                )
+            self.db.execute("""CREATE TRIGGER IF NOT EXISTS session_updates_dashboard AFTER INSERT ON sessions
+                BEGIN
+                    UPDATE dashboard_totals SET sessions=sessions+1,
+                        held_amount=held_amount+CASE WHEN json_extract(NEW.decision,'$.ui_mode')='MIRAGE_HOLD'
+                            THEN NEW.amount ELSE 0 END,
+                        inference_sum=inference_sum+COALESCE(NEW.inference,0),
+                        inference_count=inference_count+(NEW.inference IS NOT NULL) WHERE id=1;
+                    INSERT OR IGNORE INTO observed_rings SELECT NEW.ring WHERE NEW.ring IS NOT NULL;
+                END""")
+
     def session(self, session_id):
         return self.db.execute(
             "SELECT * FROM sessions WHERE id=?", (session_id,)
@@ -85,9 +115,25 @@ class Store:
                 (json.dumps(confirmation), session),
             )
 
-    def snapshot(self):
+    def directory(self, prefix, after):
         rows = self.db.execute(
-            """SELECT s.id, s.event,
+            """
+            SELECT account AS account_id, COUNT(*) AS transfers,
+                   COUNT(DISTINCT json_extract(event,'$.map_point.operator_id')) AS operators
+            FROM sessions WHERE account > ? AND substr(account,1,length(?))=?
+            GROUP BY account ORDER BY account LIMIT 51
+        """,
+            (after, prefix, prefix),
+        ).fetchall()
+        return {
+            "accounts": [dict(row) for row in rows[:50]],
+            "next": rows[49]["account_id"] if len(rows) > 50 else None,
+        }
+
+    def snapshot(self, account=None):
+        account_clause = "WHERE s.account=?" if account else ""
+        rows = self.db.execute(
+            f"""SELECT s.id, s.event,
                       json_extract(s.dossier,'$.match_confidence') confidence,
                       json_extract(s.dossier,'$.linked_account_ids') accounts,
                       json_extract(s.dossier,'$.policy.step_up_threshold') threshold,
@@ -97,7 +143,8 @@ class Store:
                FROM sessions s LEFT JOIN bans b
                  ON b.operator=json_extract(s.event,'$.map_point.operator_id')
                 AND b.mode=json_extract(s.dossier,'$.ml_mode')
-               ORDER BY s.rowid DESC LIMIT 200"""
+               {account_clause} ORDER BY s.rowid DESC LIMIT 200""",
+            (account,) if account else (),
         )
         events, identity = [], {}
         for row in rows:
@@ -107,15 +154,17 @@ class Store:
                 "match_confidence": row["confidence"],
                 "linked_account_ids": json.loads(row["accounts"] or "[]"),
                 "eligible_for_enrollment": (
-                    row["mode"] == "live" and row["ban"] is None
-                    and row["enrolled"] is None and row["threshold"] is not None
+                    row["mode"] == "live"
+                    and row["ban"] is None
+                    and row["enrolled"] is None
+                    and row["threshold"] is not None
                     and eligible_for_enrollment(event, row["threshold"])
                 ),
             }
         kpis = self.db.execute("""
-            SELECT COUNT(*) sessions, COALESCE(SUM(CASE WHEN json_extract(decision,'$.ui_mode')='MIRAGE_HOLD'
-              THEN amount ELSE 0 END),0) held_amount_kzt, COUNT(DISTINCT ring) ring_count,
-              AVG(inference) average_inference_ms FROM sessions
+            SELECT sessions, held_amount AS held_amount_kzt, (SELECT COUNT(*) FROM observed_rings) AS ring_count,
+                   inference_sum / NULLIF(inference_count,0) AS average_inference_ms
+            FROM dashboard_totals WHERE id=1
         """).fetchone()
         return events, dict(kpis), identity
 

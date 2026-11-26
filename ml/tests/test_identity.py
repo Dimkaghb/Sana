@@ -27,6 +27,8 @@ class FeatureTests(unittest.TestCase):
         other = extract(payload)
         np.testing.assert_equal(first.stats, other.stats)
         np.testing.assert_equal(first.sequence, other.sequence)
+        np.testing.assert_equal(first.windows, other.windows)
+        self.assertEqual(first.windows.shape, (64, 6))
         self.assertEqual(first.stats.shape, (36,))
         self.assertEqual(first.sequence.shape, (64, 6))
 
@@ -66,6 +68,28 @@ class IdentityApiTests(unittest.TestCase):
             create_app(self.model, self.temp.name, False, "test-operator")
         )
 
+    def test_new_contact_windows_enter_the_embedding(self):
+        sample = session(1, 9)
+        old = extract(sample)
+        sample["contacts"] = [
+            dict(
+                down_ms=300,
+                up_ms=580,
+                field="review",
+                pointer_type="touch",
+                is_trusted=True,
+            )
+        ]
+        new = extract(sample)
+        np.testing.assert_equal(old.stats, new.stats)
+        np.testing.assert_equal(old.sequence, new.sequence)
+        self.assertFalse(np.array_equal(old.windows, new.windows, equal_nan=True))
+        with self.open() as http:
+            vectors = http.app.state.store.model.embed([old, new])
+            self.assertEqual(vectors.shape, (2, 128))
+            self.assertGreater(np.linalg.norm(vectors[0] - vectors[1]), 1e-5)
+            np.testing.assert_allclose(np.linalg.norm(vectors, axis=1), 1, atol=1e-5)
+
     def test_persisted_retry_enrollment_ring_and_ban(self):
         raw = session(0, 8)
         score_path = "/ml/embed-and-score"
@@ -102,6 +126,17 @@ class IdentityApiTests(unittest.TestCase):
                 "operator_fingerprint"
             ]
             self.assertRegex(fingerprint, r"^[0-9a-f]{64}$")
+            page = http.get("/ml/population-page").json()
+            self.assertIsNone(page["next"])
+            self.assertEqual(len(page["points"]), 5)
+            store = http.app.state.store
+            page1 = store.population_page(None, limit=2)
+            page2 = store.population_page(page1["next"], limit=2)
+            self.assertTrue(
+                {p["session_id"] for p in page1["points"]}.isdisjoint(
+                    {p["session_id"] for p in page2["points"]}
+                )
+            )
             self.assertEqual(
                 http.post(
                     "/ml/sessions/cross/enroll", headers=self.headers

@@ -7,6 +7,7 @@ import json
 import os
 import secrets
 import time
+from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -17,6 +18,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from contracts.windows import sliding_windows
 from scripts.validate_contracts import (
     reject_constant,
     unique_object,
@@ -24,6 +26,7 @@ from scripts.validate_contracts import (
     validators,
 )
 
+from . import accounts
 from .calibration import save_recording
 from .coercion_engine import analyze_coercion
 from .config import Settings
@@ -37,6 +40,7 @@ BODY_LIMIT = 1_048_576
 LOCAL_HOLD_IDENTITY_BUDGET = 0.075
 IDENTITY_BUDGET = 1.5
 COLLECTION_LIMITS = {
+    "contacts": 512,
     "imu_samples": 4096,
     "slider_trace": 2048,
     "taps": 512,
@@ -95,10 +99,13 @@ def create_app(settings=None, transport=None):
         config = settings or Settings.from_env()
         state = app.state
         state.config = config
+        state.login_attempts = {}
+        state.logins = asyncio.Semaphore(2)
         state.checks = validators()
         state.store = Store(config.database)
         # Held and waiting coroutines keep a strong reference to their session
         # lock. Completed IDs disappear from memory and are recovered via SQLite.
+        accounts.initialize(state.store.db)
         state.sessions = WeakValueDictionary()
         state.identity_access = IdentityAccess()
         state.dashboard = set()
@@ -131,7 +138,119 @@ def create_app(settings=None, transport=None):
         allow_headers=["Authorization", "Content-Type", "X-Calibration-Consent"],
     )
 
+    @app.middleware("http")
+    async def private_responses(request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+    def identity(connection, role):
+        return accounts.principal(
+            app.state.store.db, connection.cookies.get("sana_" + role), role
+        )
+
+    def check_origin(request):
+        origin = request.headers.get("origin")
+        if origin and origin not in app.state.config.origins:
+            raise HTTPException(403, "Unrecognized origin")
+
+    @app.get("/api/v1/auth/{role}/me")
+    async def whoami(role: str, request: Request):
+        if role not in {"mobile", "analyst"}:
+            raise HTTPException(404)
+        alias = identity(request, role)
+        return JSONResponse(
+            {"alias": alias, "fixture_access": app.state.config.fixture_access},
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.post("/api/v1/auth/{role}/login")
+    async def login(role: str, request: Request):
+        check_origin(request)
+        body = await read_json(request, 2048)
+        if (
+            role not in {"mobile", "analyst"}
+            or not isinstance(body, dict)
+            or set(body) != {"alias", "password"}
+            or not isinstance(body["alias"], str)
+            or not accounts.ALIAS.fullmatch(body["alias"])
+            or not isinstance(body["password"], str)
+            or not 1 <= len(body["password"]) <= 128
+            or any(0xD800 <= ord(c) <= 0xDFFF for c in body["password"])
+        ):
+            raise HTTPException(422, "Invalid sign-in")
+        now = time.monotonic()
+        attempts = app.state.login_attempts
+        if len(attempts) >= 2048:
+            app.state.login_attempts = attempts = {
+                k: v for k, v in attempts.items() if v[-1] > now - 60
+            }
+        source = request.client.host if request.client else "local"
+        if source not in attempts and len(attempts) >= 2048:
+            raise HTTPException(429, "Sign-in busy. Try again.")
+        history = attempts.setdefault(source, deque())
+        while history and history[0] <= now - 60:
+            history.popleft()
+        if len(history) >= 20:
+            raise HTTPException(429, "Try again in one minute")
+        history.append(now)
+        db = app.state.store.db
+        row = db.execute(
+            "SELECT * FROM login_accounts WHERE alias=? AND role=?",
+            (body["alias"], role),
+        ).fetchone()
+        if app.state.logins.locked():
+            raise HTTPException(429, "Sign-in busy. Try again.")
+        async with app.state.logins:
+            candidate = await asyncio.to_thread(
+                accounts.verifier, body["password"], row["salt"] if row else bytes(16)
+            )
+        if not row or not hmac.compare_digest(candidate, row["verifier"]):
+            raise HTTPException(401, "Invalid sign-in")
+        response = JSONResponse(
+            {"alias": row["alias"]}, headers={"Cache-Control": "no-store"}
+        )
+        # Plain HTTP cookies are allowed only for local browser development.
+        local_http = (
+            request.url.hostname in {"127.0.0.1", "localhost", "testserver"}
+            and request.url.scheme == "http"
+        )
+        response.set_cookie(
+            "sana_" + role,
+            accounts.issue(db, row["alias"]),
+            max_age=accounts.TTL,
+            httponly=True,
+            secure=not local_http,
+            samesite="strict",
+        )
+        return response
+
+    @app.post("/api/v1/auth/{role}/logout")
+    async def logout(role: str, request: Request):
+        check_origin(request)
+        if role not in {"mobile", "analyst"}:
+            raise HTTPException(404)
+        cookie = "sana_" + role
+        token = request.cookies.get(cookie, "")
+        with app.state.store.db as db:
+            db.execute(
+                "DELETE FROM login_sessions WHERE digest=?", (accounts.digest(token),)
+            )
+        sockets = (
+            app.state.dashboard if role == "analyst" else app.state.phones.values()
+        )
+        for ws in tuple(sockets):
+            if token and ws.cookies.get(cookie) == token:
+                await ws.close(code=1008)
+        response = JSONResponse({"signed_out": True})
+        response.delete_cookie(cookie)
+        return response
+
     def admin(request):
+        if identity(request, "analyst"):
+            check_origin(request)
+            return
         token = app.state.config.admin_token
         if not token or not hmac.compare_digest(bearer(request), token.encode()):
             raise HTTPException(403, "Analyst authorization required")
@@ -157,7 +276,10 @@ def create_app(settings=None, transport=None):
         await asyncio.gather(*(send(ws) for ws in tuple(sockets)))
 
     async def notify(message):
-        await broadcast(app.state.dashboard, message)
+        sockets = app.state.dashboard
+        if not app.state.config.fixture_access:
+            sockets = {ws for ws in sockets if identity(ws, "analyst")}
+        await broadcast(sockets, message)
 
     async def refresh_guardian(account):
         sockets = app.state.guardians.get(account)
@@ -180,9 +302,15 @@ def create_app(settings=None, transport=None):
         return {"status": "ready", "ml_mode": app.state.config.mode}
 
     async def read_telemetry(request):
+        check_origin(request)
+        account = identity(request, "mobile")
+        if not account and not app.state.config.fixture_access:
+            raise HTTPException(401, "Mobile sign-in required")
         telemetry = await read_json(request)
         if not isinstance(telemetry, dict):
             raise HTTPException(422, "Expected a Contract A object")
+        if account and telemetry.get("account_id") != account:
+            raise HTTPException(403, "Account mismatch")
         for key, limit in COLLECTION_LIMITS.items():
             if isinstance(telemetry.get(key), list) and len(telemetry[key]) > limit:
                 raise HTTPException(413, "Telemetry collection exceeds limit")
@@ -327,6 +455,7 @@ def create_app(settings=None, transport=None):
                 "ml_mode": mode,
                 "policy": asdict(policy),
                 "event": event,
+                "windows": sliding_windows(telemetry),
                 "physics_ms": physics_ms,
                 "recoil": recoil.measurements,
                 "coercion": coercion.measurements,
@@ -345,10 +474,19 @@ def create_app(settings=None, transport=None):
             return decision
 
     @app.get("/api/v1/dashboard/init")
-    async def dashboard_init():
+    async def dashboard_init(
+        request: Request,
+        include_map: bool = True,
+        account: str | None = None,
+        map_page: str | None = None,
+    ):
+        if not app.state.config.fixture_access:
+            admin(request)
         state = app.state
-        population = await state.ml.population()
-        events, kpis, identity = state.store.snapshot()
+        if map_page and len(map_page) > 36:
+            raise HTTPException(422, "Invalid map cursor")
+        population = await state.ml.population(map_page) if include_map else None
+        events, kpis, identity = state.store.snapshot(account)
         return {
             "events": events,
             "session_identity": identity,
@@ -356,6 +494,43 @@ def create_app(settings=None, transport=None):
             "ml_mode": state.config.mode,
             "active_sessions": list(state.phones),
             "population_map": population,
+        }
+
+    @app.get("/api/v1/mobile/history")
+    async def history(request: Request):
+        account = identity(request, "mobile")
+        if not account:
+            raise HTTPException(401, "Mobile sign-in required")
+        rows = app.state.store.db.execute(
+            """
+            SELECT amount, json_extract(event,'$.timestamp') timestamp,
+                   json_extract(decision,'$.reference_code') reference_code,
+                   json_extract(decision,'$.display_title') display_title
+            FROM sessions WHERE account=? ORDER BY rowid DESC LIMIT 50
+        """,
+            (account,),
+        )
+        return JSONResponse(
+            [dict(row) for row in rows], headers={"Cache-Control": "no-store"}
+        )
+
+    @app.get("/api/v1/dashboard/accounts")
+    async def directory(request: Request, prefix: str = "", after: str = ""):
+        if not app.state.config.fixture_access:
+            admin(request)
+        if len(prefix) > 128 or len(after) > 128:
+            raise HTTPException(422, "Alias filter too long")
+        return app.state.store.directory(prefix, after)
+
+    @app.get("/api/v1/sessions/{session}/windows")
+    async def windows(session: str, request: Request):
+        admin(request)
+        row = app.state.store.session(session)
+        if not row:
+            raise HTTPException(404)
+        return {
+            "session_id": session,
+            "windows": json.loads(row["dossier"]).get("windows"),
         }
 
     @app.get("/api/v1/cases/{session}/export-antifraud")
@@ -497,13 +672,25 @@ def create_app(settings=None, transport=None):
 
     @app.websocket("/ws/dashboard")
     async def dashboard_ws(ws: WebSocket):
-        if not allowed(ws):
+        if not allowed(ws) or (
+            not app.state.config.fixture_access and not identity(ws, "analyst")
+        ):
             await ws.close(code=1008)
             return
         await ws.accept()
         app.state.dashboard.add(ws)
         try:
-            await listen(ws)
+            if app.state.config.fixture_access:
+                await listen(ws)
+            else:
+                while identity(ws, "analyst"):
+                    try:
+                        await asyncio.wait_for(listen(ws), 30)
+                        break
+                    except TimeoutError:
+                        continue
+                else:
+                    await ws.close(code=1008)
         finally:
             app.state.dashboard.discard(ws)
 
@@ -539,7 +726,12 @@ def create_app(settings=None, transport=None):
     @app.websocket("/ws/mobile/{session}")
     async def mobile_ws(ws: WebSocket, session: str):
         phones = app.state.phones
-        if not allowed(ws) or session in phones or len(session) > 128:
+        if (
+            (not app.state.config.fixture_access and not identity(ws, "mobile"))
+            or not allowed(ws)
+            or session in phones
+            or len(session) > 128
+        ):
             await ws.close(code=1008)
             return
         phones[session] = ws

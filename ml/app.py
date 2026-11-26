@@ -10,7 +10,7 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import RLock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import torch
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -33,7 +33,13 @@ from .vector_store import Conflict, IdentityStore
 
 BASE = Path(__file__).resolve().parent
 MAX_BYTES = 1024 * 1024
-LIMITS = {"imu_samples": 4096, "keystrokes": 512, "taps": 512, "slider_trace": 2048}
+LIMITS = {
+    "contacts": 512,
+    "imu_samples": 4096,
+    "keystrokes": 512,
+    "taps": 512,
+    "slider_trace": 2048,
+}
 
 
 def open_store(directory, data, seed, generation=None):
@@ -71,7 +77,7 @@ def open_store(directory, data, seed, generation=None):
 
 def create_app(model_dir=None, data_dir=None, seed=None, token=None):
     configured = Path(
-        model_dir or os.environ.get("ML_MODEL_DIR", BASE / "artifacts" / "synthetic-v1")
+        model_dir or os.environ.get("ML_MODEL_DIR", BASE / "artifacts" / "synthetic-v2")
     ).resolve()
     data = Path(
         data_dir or os.environ.get("ML_DATA_DIR", BASE / "data" / "identity")
@@ -86,18 +92,30 @@ def create_app(model_dir=None, data_dir=None, seed=None, token=None):
         torch.set_num_threads(1)
         data.mkdir(parents=True, exist_ok=True)
         pointer = data / "active-model.json"
-        active = configured
+        base = configured
+        if model_dir is None and "ML_MODEL_DIR" not in os.environ:
+            legacy = BASE / "artifacts" / "synthetic-v1"
+            manifest_path = legacy / "manifest.json"
+            if pointer.exists():
+                base = Path(json.loads(pointer.read_text())["base"])
+            elif (
+                manifest_path.exists()
+                and (data / json.loads(manifest_path.read_text())["id"]).is_dir()
+            ):
+                base = legacy
+        active = base
         generation = None
         if pointer.exists():
             saved = json.loads(pointer.read_text())
-            if saved["base"] == str(configured):
+            if saved["base"] == str(base):
                 active = Path(saved["active"])
                 generation = saved.get("generation")
-        if not active.exists() and active == BASE / "artifacts" / "synthetic-v1":
+        if not active.exists() and active == BASE / "artifacts" / "synthetic-v2":
             await run_in_threadpool(fit, active, synthetic_training(), "synthetic")
         store, manifest = await run_in_threadpool(
             open_store, active, data, seed, generation
         )
+        app.state.base = base
         app.state.store, app.state.manifest, app.state.active = store, manifest, active
         try:
             yield
@@ -161,6 +179,10 @@ def create_app(model_dir=None, data_dir=None, seed=None, token=None):
             raise HTTPException(422, "Invalid Contract A session") from exc
         return await run_in_threadpool(with_store, "score", payload)
 
+    @app.get("/ml/population-page")
+    def population_page(cursor: UUID | None = None):
+        return with_store("population_page", str(cursor) if cursor else None)
+
     @app.get("/ml/population-map")
     def population_map():
         return with_store("population_map")
@@ -213,7 +235,7 @@ def create_app(model_dir=None, data_dir=None, seed=None, token=None):
                 tmp.write_text(
                     json.dumps(
                         {
-                            "base": str(configured),
+                            "base": str(app.state.base),
                             "active": str(candidate),
                             "generation": candidate.name,
                         }

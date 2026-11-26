@@ -29,7 +29,7 @@ def build_app(dist: Path):
     async def client_page():
         return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
-    for route in ("/", "/mobile", "/dashboard", "/guardian"):
+    for route in ("/", "/mobile", "/dashboard", "/dashboard/map", "/dashboard/accounts", "/dashboard/signals", "/guardian"):
         app.add_api_route(route, client_page, methods=["GET"], include_in_schema=False)
 
     class StageAssets(StaticFiles):

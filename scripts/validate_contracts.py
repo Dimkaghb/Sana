@@ -85,9 +85,12 @@ def validate_payload(letter, payload, checks=None):
                 errors.append(f"{stream}: timestamps must be nondecreasing")
             if any(t > duration for t in times):
                 errors.append(f"{stream}: timestamp exceeds duration_ms")
-        for event in payload["keystrokes"]:
+        contacts = payload.get("contacts", [])
+        if any(a["down_ms"] > b["down_ms"] for a, b in zip(contacts, contacts[1:])):
+            errors.append("contacts: timestamps must be nondecreasing")
+        for event in [*payload["keystrokes"], *contacts]:
             if not event["down_ms"] <= event["up_ms"] <= duration:
-                errors.append("keystrokes: require down_ms <= up_ms <= duration_ms")
+                errors.append("timing: require down_ms <= up_ms <= duration_ms")
         samples = payload["imu_samples"]
         if samples and samples[-1]["t_ms"] - samples[0]["t_ms"] > 20000:
             errors.append("imu_samples: retained window exceeds 20 seconds")

@@ -21,7 +21,7 @@ def calibrate(manifest, output, initial, epochs=20, attention=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest")
-    parser.add_argument("--initial", default="ml/artifacts/synthetic-v1")
+    parser.add_argument("--initial", default="ml/artifacts/synthetic-v2")
     parser.add_argument("--output", required=True)
     parser.add_argument("--attention", action="store_true")
     args = parser.parse_args()

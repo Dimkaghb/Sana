@@ -46,6 +46,7 @@ def fit(directory, records, source, epochs=35, initial=None, attention=False):
                     "operators": len(set(labels)),
                     "epochs": epochs,
                     "attention": attention,
+                    "window_version": 1,
                     "training_session_ids": [p["session_id"] for p in payloads],
                 },
                 indent=2,
@@ -63,7 +64,9 @@ def load(directory):
         digest.update((directory / name).read_bytes())
     if manifest["id"] != digest.hexdigest():
         raise ValueError("Model artifact checksum mismatch")
-    model = Encoder(manifest.get("attention", False))
+    model = Encoder(
+        manifest.get("attention", False), windowed=manifest.get("window_version") == 1
+    )
     model.load_state_dict(
         torch.load(directory / "encoder.pt", weights_only=True, map_location="cpu")
     )
@@ -75,12 +78,29 @@ def load(directory):
 
 
 def synthetic_training():
-    return [(person, session(person, i)) for person in range(18) for i in range(20, 26)]
+    records = []
+    for person in range(18):
+        for i in range(20, 26):
+            payload = session(person, i)
+            # Simulate both SDK versions in the labeled synthetic training set.
+            if i % 2 == 0:
+                payload["contacts"] = [
+                    dict(
+                        down_ms=k["down_ms"],
+                        up_ms=k["up_ms"],
+                        field="recipient",
+                        pointer_type="touch",
+                        is_trusted=True,
+                    )
+                    for k in payload["keystrokes"]
+                ]
+            records.append((person, payload))
+    return records
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", default="ml/artifacts/synthetic-v1")
+    parser.add_argument("--output", default="ml/artifacts/synthetic-v2")
     parser.add_argument("--epochs", type=int, default=35)
     parser.add_argument("--attention", action="store_true")
     args = parser.parse_args()

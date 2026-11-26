@@ -10,7 +10,7 @@ After installing the backend and ML environments and running `npm ci && npm run 
 .venv/bin/python -m scripts.rehearse --mode live
 ```
 
-Open the printed dashboard, mobile, and Guardian URLs. Each run creates a new private local directory for its databases and a mode-0600 access file containing the analyst and Guardian demo credentials. Ctrl-C stops both services. Use `--mode mock` for a fixture rehearsal without installing ML. Use the [offline LAN instructions](docs/OFFLINE_REHEARSAL.md) to run on actual phones. A [60-second software rehearsal](docs/demo/software-rehearsal.mp4) is available for projector backup.
+Open the printed dashboard, mobile, and Guardian URLs. Each run creates a new private local directory for its databases and a mode-0600 access file containing per-account passwords under `logins` and the scoped Guardian credentials under `guardians`. Sign in at `/mobile` with a mobile alias such as `acc_student_101`, and at `/dashboard` with `analyst`. The phone receives its receipt and the analyst receives the persisted event. Open **Signal windows** for the normalized measurements, **Accounts** for account-filtered transfers, and **Population map** for the UMAP projection. Ctrl-C stops both services. Use `--mode mock` for a fixture rehearsal without installing ML. Use the [offline LAN instructions](docs/OFFLINE_REHEARSAL.md) to run on actual phones. A [60-second software rehearsal](docs/demo/software-rehearsal.mp4) is available for projector backup.
 
 ## Run locally
 
@@ -19,6 +19,8 @@ Use Python 3.12 for the backend and ML environments. From the repository root:
 ```sh
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -r backend/requirements.txt
+.venv/bin/python -m backend.accounts mobile acc_student_101
+.venv/bin/python -m backend.accounts analyst analyst
 ML_MODE=mock .venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 

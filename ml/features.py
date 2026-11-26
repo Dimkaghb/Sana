@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 import numpy as np
+from contracts.windows import CHANNELS, MAX_WINDOWS, sliding_windows
 
 NAMES = (
     "dwell_mean dwell_std dwell_p90 iki_mean iki_std iki_iqr iki_skew backspace_ratio "
@@ -22,6 +23,7 @@ class Features:
     stats: np.ndarray
     sequence: np.ndarray
     modalities: int
+    windows: np.ndarray
 
 
 def column(rows, key):
@@ -173,4 +175,9 @@ def extract(payload):
         or np.any(np.isinf(sequence))
     ):
         raise InsufficientEvidence("Measurements exceed supported numerical range")
-    return Features(stats.astype("float32"), sequence.astype("float32"), modalities)
+    windows = np.full((MAX_WINDOWS, len(CHANNELS)), np.nan, dtype=np.float32)
+    for i, window in enumerate(sliding_windows(payload)):
+        windows[i] = [window[channel] for channel in CHANNELS]
+    return Features(
+        stats.astype("float32"), sequence.astype("float32"), modalities, windows
+    )

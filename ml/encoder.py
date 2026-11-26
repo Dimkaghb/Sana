@@ -7,7 +7,7 @@ from torch.nn import functional as F
 
 
 class Encoder(nn.Module):
-    def __init__(self, attention=False):
+    def __init__(self, attention=False, windowed=True):
         super().__init__()
         self.register_buffer("center", torch.zeros(36))
         self.register_buffer("scale", torch.ones(36))
@@ -24,6 +24,13 @@ class Encoder(nn.Module):
             nn.SiLU(),
         )
         self.attention = nn.Conv1d(128, 1, 1) if attention else None
+        self.window_encoder = (
+            nn.Sequential(
+                nn.Conv1d(12, 64, 3, padding=1), nn.SiLU(), nn.Conv1d(64, 128, 1)
+            )
+            if windowed
+            else None
+        )
         self.fusion = nn.Linear(256, 128)
 
     def fit_scaler(self, stats, sequences):
@@ -37,7 +44,7 @@ class Encoder(nn.Module):
                     center[i] = finite.mean()
                     scale[i] = finite.std(unbiased=False).clamp_min(0.01)
 
-    def forward(self, stats, sequence):
+    def forward(self, stats, sequence, windows):
         stats = ((stats - self.center) / self.scale).nan_to_num().clamp(-5, 5)
         sequence = (
             ((sequence - self.seq_center) / self.seq_scale).nan_to_num().clamp(-5, 5)
@@ -52,19 +59,28 @@ class Encoder(nn.Module):
         else:
             weights = self.attention(temporal).softmax(dim=2)
             pooled = (weights * temporal).sum(dim=2)
+        if self.window_encoder is not None:
+            observed = torch.isfinite(windows)
+            active = observed.any(dim=2).unsqueeze(1)
+            channels = torch.cat((windows.nan_to_num(), observed.float()), dim=2)
+            encoded = self.window_encoder(channels.transpose(1, 2))
+            pooled = pooled + (encoded * active).sum(dim=2) / active.sum(
+                dim=2
+            ).clamp_min(1)
         latent = torch.cat((static + self.residual(static), pooled), dim=1)
         return F.normalize(self.fusion(latent), dim=1)
 
     @torch.inference_mode()
     def embed(self, features):
-        stats, seq = tensors(features)
-        return self(stats, seq).cpu().numpy()
+        stats, seq, windows = tensors(features)
+        return self(stats, seq, windows).cpu().numpy()
 
 
 def tensors(features):
     return (
         torch.from_numpy(np.stack([f.stats for f in features])),
         torch.from_numpy(np.stack([f.sequence for f in features])),
+        torch.from_numpy(np.stack([f.windows for f in features])),
     )
 
 
@@ -76,7 +92,7 @@ def train(features, labels, epochs=35, initial=None, attention=False):
         model.load_state_dict(
             torch.load(initial, map_location="cpu", weights_only=True), strict=False
         )
-    stats, seq = tensors(features)
+    stats, seq, windows = tensors(features)
     model.fit_scaler(stats, seq)
     label_ids = torch.tensor(np.unique(labels, return_inverse=True)[1])
     same = label_ids[:, None] == label_ids[None, :]
@@ -89,7 +105,7 @@ def train(features, labels, epochs=35, initial=None, attention=False):
         )
     opt = torch.optim.AdamW(model.parameters(), lr=0.001)
     for _ in range(epochs):
-        vectors = model(stats, seq)
+        vectors = model(stats, seq, windows)
         distances = 1 - vectors @ vectors.T
         hard_pos = distances.masked_fill(~positive, -2).max(1).values
         hard_neg = distances.masked_fill(~others, 3).min(1).values

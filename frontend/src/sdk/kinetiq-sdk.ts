@@ -8,6 +8,7 @@ import type {
   TransferContext,
 } from "./types";
 
+type Contact = NonNullable<SessionTelemetry["contacts"]>[number];
 const clamp = (value: number, min = 0, max = 1) =>
   Math.max(min, Math.min(max, value));
 const finite = (value: unknown): value is number =>
@@ -67,6 +68,8 @@ export class KinetiqSDK {
   private motionHead = 0;
   private motionCount = 0;
   private readonly touches = new Map<number, Omit<KeySample, "up_ms">>();
+  private contacts: Contact[] = [];
+  private held = new Map<number, Omit<Contact, "up_ms">>();
   private slider?: number;
   private orientation?: Pick<MotionSample, "alpha" | "beta" | "gamma">;
   private frozen?: SessionTelemetry;
@@ -122,6 +125,25 @@ export class KinetiqSDK {
             : null;
         if (!field) return;
         const point = this.position(e);
+        const category = field.dataset.kinetiqField;
+        if (
+          (category === "recipient" ||
+            category === "amount" ||
+            category === "slider" ||
+            category === "preset" ||
+            category === "review" ||
+            category === "recipient_type") &&
+          (e.pointerType === "touch" ||
+            e.pointerType === "mouse" ||
+            e.pointerType === "pen") &&
+          this.held.size < 16
+        )
+          this.held.set(e.pointerId, {
+            field: category,
+            pointer_type: e.pointerType,
+            is_trusted: e.isTrusted,
+            down_ms: point.t_ms,
+          });
         if (
           finite(e.width) &&
           finite(e.height) &&
@@ -168,6 +190,17 @@ export class KinetiqSDK {
         this.trace(e);
         const key = this.touches.get(e.pointerId);
         const released = this.time(e);
+        const contact = this.held.get(e.pointerId);
+        if (
+          contact &&
+          released >= contact.down_ms &&
+          this.contacts.length < 512
+        )
+          this.contacts.push({
+            ...contact,
+            is_trusted: contact.is_trusted && e.isTrusted,
+            up_ms: released,
+          });
         if (key && released >= key.down_ms && this.keys.length < 512)
           this.keys.push({ ...key, up_ms: released });
         this.release(e.pointerId);
@@ -177,6 +210,15 @@ export class KinetiqSDK {
     document.addEventListener(
       "pointercancel",
       (e) => this.release(e.pointerId),
+      options,
+    );
+    document.addEventListener(
+      "visibilitychange",
+      () => {
+        this.held.clear();
+        this.touches.clear();
+        this.slider = undefined;
+      },
       options,
     );
     if (onDemoClick) this.connect(onDemoClick);
@@ -273,6 +315,7 @@ export class KinetiqSDK {
     };
   }
   private release(id: number) {
+    this.held.delete(id);
     this.touches.delete(id);
     if (this.slider === id) this.slider = undefined;
   }
@@ -335,6 +378,9 @@ export class KinetiqSDK {
         os: osLabel(),
         sample_rate_hz: span > 0 ? ((samples.length - 1) * 1000) / span : 0,
       },
+      contacts: this.contacts
+        .map((c) => ({ ...c }))
+        .sort((a, b) => a.down_ms - b.down_ms),
       taps: this.taps.map((t) => ({ ...t })).sort((a, b) => a.t_ms - b.t_ms),
       slider_trace: this.sliders
         .map((t) => ({ ...t }))
@@ -421,6 +467,8 @@ export class KinetiqSDK {
   }
   stop() {
     this.detach();
+    this.contacts.length = 0;
+    this.held.clear();
     this.lifetime.abort();
     clearTimeout(this.delay);
     this.motion.length =

@@ -305,30 +305,55 @@ class IdentityStore:
 
     def population_map(self):
         with self.lock:
-            points, groups = [], {}
             banned = {p.payload["operator_id"] for p in self.scroll("banned_operators")}
-            for p in self.scroll("global_sessions"):
-                row = p.payload
-                pt = row.get("projection") or row["result"]["map_point"]
-                points.append(
-                    {
-                        **pt,
-                        **{
-                            k: row[k]
-                            for k in ("session_id", "account_id", "operator_id")
-                        },
-                        "synthetic": row["scope"] == "synthetic",
-                        "status": "BANNED"
-                        if row["operator_id"] in banned
-                        else row["status"],
-                    }
+            return self.projected_rows(self.scroll("global_sessions"), banned)
+
+    def population_page(self, cursor, limit=250):
+        with self.lock:
+            rows, following = self.client.scroll(
+                self.prefix + "global_sessions",
+                offset=cursor,
+                limit=limit,
+                with_vectors=False,
+            )
+            ids = {
+                point_id(row.payload["scope"], row.payload["operator_id"])
+                for row in rows
+            }
+            bans = (
+                self.client.retrieve(
+                    self.prefix + "banned_operators", list(ids), with_vectors=False
                 )
-                if pt["cluster_id"] >= 0:
-                    groups.setdefault(pt["cluster_id"], []).append([pt["x"], pt["y"]])
-            clusters = []
-            for cid, coords in groups.items():
-                x, y = np.mean(coords, axis=0)
-                clusters.append(
-                    dict(cluster_id=cid, x=float(x), y=float(y), size=len(coords))
-                )
-            return {"points": points, "clusters": clusters}
+                if ids
+                else []
+            )
+            page = self.projected_rows(
+                rows, {ban.payload["operator_id"] for ban in bans}
+            )
+            return {**page, "next": str(following) if following is not None else None}
+
+    @staticmethod
+    def projected_rows(rows, banned):
+        points, groups = [], {}
+        for p in rows:
+            row = p.payload
+            pt = row.get("projection") or row["result"]["map_point"]
+            points.append(
+                {
+                    **pt,
+                    **{k: row[k] for k in ("session_id", "account_id", "operator_id")},
+                    "synthetic": row["scope"] == "synthetic",
+                    "status": "BANNED"
+                    if row["operator_id"] in banned
+                    else row["status"],
+                }
+            )
+            if pt["cluster_id"] >= 0:
+                groups.setdefault(pt["cluster_id"], []).append([pt["x"], pt["y"]])
+        clusters = []
+        for cid, coords in groups.items():
+            x, y = np.mean(coords, axis=0)
+            clusters.append(
+                dict(cluster_id=cid, x=float(x), y=float(y), size=len(coords))
+            )
+        return {"points": points, "clusters": clusters}

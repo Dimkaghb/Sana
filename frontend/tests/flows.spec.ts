@@ -13,6 +13,12 @@ const fixture = (name: string) =>
 const event: DashboardEvent = fixture("normal/dashboard-event.json");
 const d = fixture("normal/mobile-decision.json");
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/v1/auth/*/me", (r) =>
+    r.fulfill({ json: { alias: null, fixture_access: true } }),
+  );
+});
+
 async function startPhone(page: Page) {
   await page.goto("/mobile");
   await page
@@ -44,6 +50,12 @@ test("phone sends bounded contract data and reuses the exact snapshot after a fa
   expect(sent[1]).toEqual(sent[0]);
   expect(sent[0].account_id).toBe("acc_student_101");
   expect(sent[0].keystrokes).toHaveLength(6);
+  expect(sent[0].contacts!.filter((c) => c.field === "recipient")).toHaveLength(
+    6,
+  );
+  expect(
+    sent[0].contacts!.every((c) => c.up_ms >= c.down_ms && c.is_trusted),
+  ).toBe(true);
   expect(sent[0].taps.every((t) => t.is_trusted)).toBe(true);
   expect(sent[0].imu_samples).toEqual([]);
   expect(sent[0].device_meta.sample_rate_hz).toBe(0);
@@ -88,7 +100,7 @@ test("dashboard reconciles duplicate events, preserves unavailable evidence and 
   await page.routeWebSocket("**/ws/dashboard", (ws) => {
     pushes = () => ws.send(JSON.stringify(missing));
   });
-  await page.route("**/api/v1/dashboard/init", (route) =>
+  await page.route("**/api/v1/dashboard/init*", (route) =>
     route.fulfill({
       json: {
         events,
@@ -192,7 +204,7 @@ test("population view preserves current ban status over the historical session s
     status: "BANNED",
     synthetic: true,
   };
-  await page.route("**/api/v1/dashboard/init", (r) =>
+  await page.route("**/api/v1/dashboard/init*", (r) =>
     r.fulfill({
       json: {
         ml_mode: "live",
@@ -210,6 +222,9 @@ test("population view preserves current ban status over the historical session s
   );
   await page.goto("/dashboard");
   await page
+    .getByRole("button", { name: "Population map", exact: true })
+    .click();
+  await page
     .getByRole("button", { name: "Inspect " + dot.operator_id, exact: true })
     .click();
   await expect(page.getByText("Operator status · banned")).toBeVisible();
@@ -220,7 +235,7 @@ test("clean live session enrollment requires independent verification and analys
   page,
 }) => {
   await page.routeWebSocket("**/ws/dashboard", () => {});
-  await page.route("**/api/v1/dashboard/init", (r) =>
+  await page.route("**/api/v1/dashboard/init*", (r) =>
     r.fulfill({
       json: {
         ml_mode: "live",

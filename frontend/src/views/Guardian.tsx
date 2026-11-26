@@ -1,3 +1,6 @@
+import { Label } from "../components/ui/label";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
 import { useEffect, useState } from "react";
 import { ArrowRight, LockKeyhole, ShieldCheck, Snowflake } from "lucide-react";
 import { Brand } from "../components/Brand";
@@ -170,19 +173,19 @@ export function Guardian() {
                 }
               }}
             >
-              <label>
+              <Label>
                 Guardian token
-                <input
+                <Input
                   autoComplete="off"
                   required
                   type="password"
                   value={entry}
                   onChange={(e) => setEntry(e.target.value)}
                 />
-              </label>
-              <button className="primary">
+              </Label>
+              <Button className="primary">
                 Open Guardian <ArrowRight size={17} />
-              </button>
+              </Button>
             </form>
           </>
         ) : (
@@ -190,7 +193,7 @@ export function Guardian() {
             <div className="guardian-status">
               <LockKeyhole size={16} />{" "}
               {preview ? "Synthetic Guardian preview" : "Account-scoped access"}{" "}
-              <button
+              <Button
                 onClick={() => {
                   if (preview) {
                     setHolds((items) =>
@@ -204,7 +207,7 @@ export function Guardian() {
                 }}
               >
                 {preview ? "Reset preview" : "Sign out"}
-              </button>
+              </Button>
             </div>
             {!error && !holds.length && <p>Waiting for held transfers.</p>}
             {holds.map((h) => (
@@ -215,7 +218,7 @@ export function Guardian() {
                   {h.reference_code} ·{" "}
                   {new Date(h.timestamp).toLocaleTimeString()}
                 </p>
-                <button
+                <Button
                   disabled={!!request || h.status === "frozen"}
                   onClick={() => void freeze(h)}
                 >
@@ -223,7 +226,7 @@ export function Guardian() {
                   {h.status === "frozen"
                     ? "Frozen"
                     : "Freeze simulated transfer"}
-                </button>
+                </Button>
               </article>
             ))}
           </>

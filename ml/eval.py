@@ -50,7 +50,7 @@ def evaluate(model, enrolled, queries):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", default="ml/artifacts/synthetic-v1")
+    parser.add_argument("--model", default="ml/artifacts/synthetic-v2")
     parser.add_argument("--manifest")
     args = parser.parse_args()
     model, _, manifest = load(args.model)

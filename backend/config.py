@@ -30,6 +30,8 @@ class Settings:
 
     calibration_dir: Path | None = None
 
+    fixture_access: bool = False
+
     @classmethod
     def from_env(cls):
         mode = os.getenv("ML_MODE")

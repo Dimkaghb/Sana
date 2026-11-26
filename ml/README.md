@@ -8,9 +8,11 @@ Prepare dependencies on the offline demo machine while connected. The uv lock co
 
 ```sh
 uv sync --project ml --locked --python 3.12
-ml/.venv/bin/python -m ml.train --output ml/artifacts/synthetic-v1
+ml/.venv/bin/python -m ml.train --output ml/artifacts/synthetic-v2
 ml/.venv/bin/python -m uvicorn ml.app:app --host 127.0.0.1 --port 8001 --workers 1
 ```
+
+Version 2 also encodes up to 64 overlapping time windows. A separate temporal convolution receives six normalized signals and six presence indicators per window. Only windows with observations contribute to its pooling. The encoder fuses this representation with the original temporal and static features. The score, centroid and projection use the same 128-dimensional space for a given generation.
 
 Training creates a new directory. Reuse an existing model by skipping the training command. The default service trains a missing default generation during first startup. It loads the local model, warms up UMAP, and seeds 150 synthetic sessions before answering `GET /health`. Prepare and start the service once before the offline rehearsal. Set the backend to live ML with this loopback service. Keep Python dependencies, `ml/artifacts/`, and `ml/data/` on the demo machine.
 
@@ -25,13 +27,14 @@ Training creates a new directory. Reuse an existing model by skipping the traini
 
 ## Inference and evidence
 
-The 36 statistics include key dwell and inter-key cadence, touch radii and aspect ratio, slider velocity and signed curvature, grip orientation, recoil, and accelerometer band power. Slider duration is available through Contract A. Tap dwell duration has no representation in the contract. The six temporal channels are relative slider x and y, acceleration x, y and z, and roll. They share 64 sampling positions over the slider interval or available IMU interval. Interpolation stays within bounded gaps. Train-set centering imputes missing values solely inside the encoder.
+The 36 statistics include key dwell and inter-key cadence, touch radii and aspect ratio, slider velocity and signed curvature, grip orientation, recoil, and accelerometer band power. Slider duration is available through Contract A. New SDK recordings also contain paired contact durations and field categories. Older SDK recordings omit this stream. The six temporal channels are relative slider x and y, acceleration x, y and z, and roll. They share 64 sampling positions over the slider interval or available IMU interval. Interpolation stays within bounded gaps. Train-set centering imputes missing values solely inside the encoder.
 
 At least two usable behavioral streams are required. Transfer amount and account identifiers do not enter the encoder. Session scoring calls a one-dimensional convolutional network and residual MLP trained with batch-hard triplet loss. Their fused output is a 128-component, L2-normalized float32 vector. HDBSCAN labels the fitted UMAP seed projection. Existing coordinates stay fixed during session scoring. A new point inherits its nearest training cluster only at cosine similarity of at least 0.80, otherwise its cluster is -1.
 
 | Route | Behavior |
 | --- | --- |
 | `POST /ml/embed-and-score` | Accept Contract A and return B. Inadequate evidence or invalid telemetry returns HTTP 422. An identical session retry returns its originally stored B. Changed data under an existing ID returns 409. A new operator has a provisional ID and null match confidence. A cold account has null owner similarity. |
+| `GET /ml/population-page?cursor=…` | Qdrant scroll page with up to 250 sessions, page cluster centroids and the next cursor. Omit the cursor for the first page. |
 | `GET /ml/population-map` | Returns `points` with session, account, operator, coordinates, cluster, status, and synthetic marker plus `clusters` with centroid and size. These are ML observations. The backend owns transfer decisions. |
 | `POST /ml/sessions/{session_id}/enroll` | Bearer-protected operator attestation that the scored session belongs to the independently verified account owner. Updates its normalized 0.8/0.2 EMA once. Three enrolled sessions enable the handoff rule. Scoring alone never enrolls a session. New enrollment returns 409 for a historical handoff or qualifying ring match, a banned operator, or a matching current ban centroid. An already-approved enrollment retry returns the existing count. |
 | `POST /ml/operators/{operator_id}/ban` | Bearer-protected, idempotent ban. Saves the operator centroid for subsequent cross-account checks. Returns the operator ID and confirmed status. |
@@ -63,12 +66,16 @@ ml/.venv/bin/python -m unittest discover -s ml/tests -v
 The baseline uses mean temporal pooling. Train the optional temporal-attention model with the same training sessions and seed, then compare the two on the same held-out sessions.
 
 ```sh
-ml/.venv/bin/python -m ml.train --attention --output ml/artifacts/attention-v1
-ml/.venv/bin/python -m ml.eval --model ml/artifacts/synthetic-v1
-ml/.venv/bin/python -m ml.eval --model ml/artifacts/attention-v1
+ml/.venv/bin/python -m ml.train --attention --output ml/artifacts/attention-v2
+ml/.venv/bin/python -m ml.eval --model ml/artifacts/synthetic-v2
+ml/.venv/bin/python -m ml.eval --model ml/artifacts/attention-v2
 ```
 
-### Synthetic rehearsal measurements
+### Windowed encoder verification
+
+With version 2, the session-disjoint synthetic evaluation used 18 gallery sessions and 18 queries. The run returned ROC-AUC 0.99964, approximate EER 0.33%, and two correct cross-account matches out of two eligible queries. These measurements describe generated profiles. Real-device false matches and generalization require separate participant data.
+
+### Earlier version 1 synthetic rehearsal measurements
 
 Both models trained on 108 generated sessions from 18 simulated operators. A different session per operator formed the enrollment gallery and another session per operator formed the queries, giving 324 pairs. Two queries had a cross-account gallery match. This evaluates held-out sessions from the same synthetic profiles.
 
@@ -79,7 +86,7 @@ Both models trained on 108 generated sessions from 18 simulated operators. A dif
 | Cross-account recall@1 | 2/2 | 2/2 |
 | Feature extraction and encoder p95 | 1.37 ms | 1.12 ms |
 
-With the baseline service on localhost, 20 fresh synthetic HTTP submissions returned schema-valid B. Warm ML compute p95 was 5.67 ms and full ML HTTP p95 was 17.03 ms on the development machine. The seeded map contained 150 points, 18 density clusters and two inferred four-account rings. The baseline remains the default pending real participant and device measurements.
+With the baseline service on localhost, 20 fresh synthetic HTTP submissions returned schema-valid B. Warm ML compute p95 was 5.67 ms and full ML HTTP p95 was 17.03 ms on the development machine. The seeded map contained 150 points, 18 density clusters and two inferred four-account rings. The version 1 comparison predates the additional window encoder.
 
 ### Qdrant server rehearsal
 

@@ -123,3 +123,11 @@ Exit: stage flow works over LAN without cloud/tunnel dependency; notification an
 | 10-12 | Failure checks, ban/export, latency, rehearsal |
 
 The PRD schedule is aggressive, not a completion guarantee. Protect the complete normal/synthetic flow first. Defer tremor/posture refinement and continuous streaming if needed; never replace missing functionality with unlabeled fabricated evidence.
+
+## Authenticated workspace and windowed identity expansion
+
+**Verified on the local live stack.** Two fictional mobile accounts signed in from a phone-sized Chromium context and submitted simulated transfers. A separate authenticated analyst received the first persisted session by WebSocket, opened its normalized timeline and UMAP point, then filtered the directory to the originating account. The second account had an empty receipt history before its own transfer. The build produces separate mobile, Guardian and dashboard JavaScript chunks.
+
+The browser SDK now pairs capped pointer down/up observations with a whitelisted field and pointer type. The backend dossier and version 2 ML encoder share a bounded window implementation. Tests exercise overlap, missing channels, compatibility with old recordings, window influence on the normalized embedding, account spoof rejection, sign-out, pagination, snapshot recovery and backfill of dashboard totals. The phone and console each remember their theme. Local rehearsal generates separate credentials for each account and the analyst.
+
+The latest run passed 21 shared contract/window tests, 17 backend tests, seven ML tests and nine browser tests, plus the seven-scenario HTTP/WebSocket rehearsal and the live enrollment, ring and ban check. Database evidence comes from local SQLite and embedded Qdrant. Deployment capacity, physical handset performance and participant accuracy still need measurements.

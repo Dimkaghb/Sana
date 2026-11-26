@@ -37,7 +37,7 @@ class RuntimeTests(unittest.TestCase):
         self.settings = Settings(
             "mock",
             self.db,
-            admin_token="test-analyst",
+            fixture_access=True, admin_token="test-analyst",
             guardian_tokens={"acc_student_101": "test-guardian", "other": "second"},
             calibration_dir=Path(self.temp.name) / "records",
         )
@@ -200,7 +200,7 @@ class RuntimeTests(unittest.TestCase):
                 return httpx.Response(200, json={})
             return httpx.Response(200, json=fixture("normal", "ml-score"))
 
-        app = create_app(Settings("live", self.db), httpx.MockTransport(ml))
+        app = create_app(Settings("live", self.db, fixture_access=True), httpx.MockTransport(ml))
         with TestClient(app) as c, ThreadPoolExecutor(2) as pool:
             payload = fixture("normal")
             first, second = list(
@@ -243,7 +243,7 @@ class RuntimeTests(unittest.TestCase):
             return httpx.Response(200, json=fixture("normal", "ml-score"))
 
         config = Settings(
-            "live", self.db, admin_token="test-analyst", ml_token="ml-test"
+            "live", self.db, fixture_access=True, admin_token="test-analyst", ml_token="ml-test"
         )
         with TestClient(create_app(config, httpx.MockTransport(ml))) as c:
             self.assertEqual(c.post(INGEST, json=fixture("normal")).status_code, 200)
@@ -294,7 +294,7 @@ class RuntimeTests(unittest.TestCase):
 
         bridge = "/api/v1/sessions/{}/enroll"
         config = Settings(
-            "live", self.db, admin_token="test-analyst", ml_token="upstream-test"
+            "live", self.db, fixture_access=True, admin_token="test-analyst", ml_token="upstream-test"
         )
         with TestClient(create_app(config, httpx.MockTransport(ml))) as c:
             for sid, scenario in [

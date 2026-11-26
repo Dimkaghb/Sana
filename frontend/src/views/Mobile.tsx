@@ -1,9 +1,15 @@
+import { Label } from "../components/ui/label";
+import { Checkbox } from "../components/ui/checkbox";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "../components/ui/native-select";
+import { Button } from "../components/ui/button";
 import { useRef, useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
   Check,
-  ChevronLeft,
   ChevronsRight,
   CreditCard,
   Delete,
@@ -17,63 +23,85 @@ import {
   type Decision,
   type SensorAccess,
 } from "../sdk";
+import { TransferHistory } from "../components/TransferHistory";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "../components/ui/dialog";
+import { Theme } from "../components/Theme";
+import { signOut } from "../components/WorkspaceAccess";
 import { fixtureDecisions } from "../demo";
 import { money } from "../types";
 
 const profiles = [
-  ["acc_student_101", "Student • 101"],
-  ["acc_victim_409", "Personal • 409"],
-  ["acc_drop_772", "Card • 772"],
+  ["acc_student_101", "Учебный • 101"],
+  ["acc_victim_409", "Личный • 409"],
+  ["acc_drop_772", "Карта • 772"],
 ];
-export function Mobile() {
+export function Mobile({ alias }: { alias?: string }) {
   const [account, setAccount] = useState(profiles[0][0]);
   const preview =
     new URLSearchParams(location.search).get("mode") === "fixtures";
+  const [logoutError, setLogoutError] = useState(false);
   const [scenario, setScenario] = useState("normal");
   const [sequence, setSequence] = useState(0);
   return (
     <main className="phone-stage">
       <section className="phone">
         <header className="phone-nav">
-          <a href="/dashboard" aria-label="Command center">
-            <ChevronLeft />
-          </a>
+          <ShieldCheck size={23} />
           <span className="bcc">
             bcc<span>.</span>kz
           </span>
-          <ShieldCheck size={21} />
+          {alias && <TransferHistory />}
+          <Theme />
         </header>
         <div className="profile">
-          <span>Demo profile</span>
-          <select
-            aria-label="Demo account"
-            value={account}
-            onChange={(e) => setAccount(e.target.value)}
-          >
-            {profiles.map(([id, label]) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
+          <span>
+            {profiles.find(([id]) => id === alias)?.[1] || alias || "Демо-счёт"}
+          </span>
+          {alias ? (
+            <Button
+              onClick={() =>
+                signOut("mobile").catch(() => setLogoutError(true))
+              }
+            >
+              Выйти
+            </Button>
+          ) : (
+            <NativeSelect
+              aria-label="Demo account"
+              value={account}
+              onChange={(e) => setAccount(e.target.value)}
+            >
+              {profiles.map(([id, label]) => (
+                <NativeSelectOption key={id} value={id}>
+                  {label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          )}
         </div>
+        {logoutError && <p role="alert">Не удалось выйти.</p>}
         {preview && (
-          <label className="profile">
-            <span>Fixture preview</span>
-            <select
+          <Label className="profile">
+            <span>Демо-сценарий</span>
+            <NativeSelect
               value={scenario}
               onChange={(e) => setScenario(e.target.value)}
             >
               {Object.keys(fixtureDecisions).map((s) => (
-                <option key={s}>{s}</option>
+                <NativeSelectOption key={s}>{s}</NativeSelectOption>
               ))}
-            </select>
-          </label>
+            </NativeSelect>
+          </Label>
         )}
         <Transfer
           fixture={preview ? fixtureDecisions[scenario] : undefined}
-          key={account + sequence + scenario}
-          account={account}
+          key={(alias || account) + sequence + scenario}
+          account={alias || account}
           reset={() => setSequence((n) => n + 1)}
         />
       </section>
@@ -102,7 +130,7 @@ function Transfer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
-  const track = useRef<HTMLDivElement>(null);
+  const track = useRef<HTMLButtonElement>(null);
   const dragged = useRef<number | undefined>(undefined);
   const sdk = useKinetiq(
     account,
@@ -175,20 +203,24 @@ function Transfer({
   if (!permission)
     return (
       <section className="consent">
-        <div className="security-art">
-          <ShieldCheck strokeWidth={1.1} />
+        <div className="bankcard consent-card">
+          <div>
+            <span>Демонстрационный счёт</span>
+            <CreditCard size={22} />
+          </div>
+          <strong>
+            1 250 000 <small>₸</small>
+          </strong>
+          <footer>
+            SANA / PAY <b>•••• 4192</b>
+          </footer>
         </div>
-        <p className="eyebrow">SANA SHIELD</p>
-        <h1>
-          Защита
-          <br />
-          переводов
-        </h1>
+        <h1>Защита переводов</h1>
         <p>
           Датчики движения и ритм касаний помогают проверить перевод. Вводите
           только вымышленные реквизиты.
         </p>
-        <button
+        <Button
           className="primary"
           disabled={prompting}
           onClick={async () => {
@@ -197,7 +229,7 @@ function Transfer({
           }}
         >
           Включить защиту SANA Shield <ArrowRight size={17} />
-        </button>
+        </Button>
         <small>Демонстрационный перевод · Деньги не списываются</small>
       </section>
     );
@@ -229,8 +261,8 @@ function Transfer({
               </p>
             ) : (
               <div>
-                <button onClick={() => setLiveness("pass")}>Пройдена</button>
-                <button onClick={() => setLiveness("fail")}>Отклонена</button>
+                <Button onClick={() => setLiveness("pass")}>Пройдена</Button>
+                <Button onClick={() => setLiveness("fail")}>Отклонена</Button>
               </div>
             )}
           </div>
@@ -239,9 +271,9 @@ function Transfer({
         <div className="reference">
           Номер операции <b>{result.reference_code}</b>
         </div>
-        <button className="primary" onClick={reset}>
+        <Button className="primary" onClick={reset}>
           Новый перевод <ArrowRight size={16} />
-        </button>
+        </Button>
       </section>
     );
   const locked = busy || !!error;
@@ -249,7 +281,33 @@ function Transfer({
     <div className="transfer">
       <div className="titleline">
         <h1>Перевод</h1>
-        <ArrowUpRight />
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button
+              size="sm"
+              disabled={locked}
+              variant="ghost"
+              data-kinetiq-field="review"
+            >
+              Детали <ArrowUpRight />
+            </Button>
+          </DialogTrigger>
+          <DialogContent
+            className="dossier-dialog"
+            aria-describedby={undefined}
+          >
+            <DialogTitle>Детали перевода</DialogTitle>
+            <dl className="review-details">
+              <dt>Сумма</dt>
+              <dd>{money(Number(amount))} ₸</dd>
+              <dt>Получатель</dt>
+              <dd>{isNew ? "Новый" : "Знакомый"}</dd>
+              <dt>Комиссия в демо</dt>
+              <dd>0 ₸</dd>
+            </dl>
+            <p>Демонстрационная операция. Деньги не списываются.</p>
+          </DialogContent>
+        </Dialog>
       </div>
       <div className="bankcard">
         <div>
@@ -260,13 +318,13 @@ function Transfer({
           1 250 000 <small>₸</small>
         </strong>
         <footer>
-          BCC IRON <b>•••• 4192</b>
+          SANA / PAY <b>•••• 4192</b>
         </footer>
       </div>
       {permission === "limited" && (
         <p className="phone-note">Доступ к датчикам ограничен.</p>
       )}
-      <button
+      <Button
         disabled={locked}
         className={"amount-field " + (field === "recipient" ? "selected" : "")}
         onClick={() => setField("recipient")}
@@ -279,8 +337,8 @@ function Transfer({
               recipient.slice(-4)
             : "Введите демо-номер"}
         </b>
-      </button>
-      <button
+      </Button>
+      <Button
         disabled={locked}
         className={"amount-field " + (field === "amount" ? "selected" : "")}
         onClick={() => setField("amount")}
@@ -288,43 +346,41 @@ function Transfer({
       >
         <small>Сумма перевода</small>
         <b>{money(Number(amount))} ₸</b>
-      </button>
-      <div className="chips">
+      </Button>
+      <div className="chips" data-kinetiq-field="preset">
         {[50000, 250000, 1000000].map((n) => (
-          <button
+          <Button
             disabled={locked}
             key={n}
             onClick={() => setAmount(String(n))}
           >
             {money(n)} ₸
-          </button>
+          </Button>
         ))}
       </div>
-      <label className="checkline">
-        <input
+      <Label className="checkline" data-kinetiq-field="recipient_type">
+        <Checkbox
           disabled={locked}
-          type="checkbox"
           checked={isNew}
-          onChange={(e) => setNew(e.target.checked)}
+          onCheckedChange={(value) => setNew(value === true)}
         />{" "}
         Новый получатель
-      </label>
+      </Label>
       {!fixture && (
-        <label className="checkline">
-          <input
+        <Label className="checkline">
+          <Checkbox
             disabled={locked}
-            type="checkbox"
             checked={calibrate}
-            onChange={(e) => setCalibrate(e.target.checked)}
+            onCheckedChange={(value) => setCalibrate(value === true)}
           />{" "}
           Сохранить телеметрию для калибровки
-        </label>
+        </Label>
       )}
       <div className="keypad">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"].map(
           (v) =>
             v ? (
-              <button
+              <Button
                 disabled={locked}
                 key={v}
                 data-kinetiq-field={field}
@@ -333,13 +389,14 @@ function Transfer({
                 aria-label={v === "del" ? "Удалить" : v}
               >
                 {v === "del" ? <Delete size={20} /> : v}
-              </button>
+              </Button>
             ) : (
               <span key="empty" />
             ),
         )}
       </div>
-      <div
+      <Button
+        type="button"
         ref={track}
         className={"slide " + (!canSubmit ? "disabled" : "")}
         role="button"
@@ -395,11 +452,11 @@ function Transfer({
         >
           <ChevronsRight size={21} />
         </i>
-      </div>
+      </Button>
       {error && (
         <div role="alert" className="phone-error">
           {error}
-          <button onClick={() => void submit()}>Повторить отправку</button>
+          <Button onClick={() => void submit()}>Повторить отправку</Button>
         </div>
       )}
       <small className="footnote">

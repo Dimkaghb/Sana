@@ -31,7 +31,7 @@ def match(session, banned=False):
 
 @asynccontextmanager
 async def connected(handler):
-    settings = Settings("live", ":memory:", admin_token="test-analyst")
+    settings = Settings("live", ":memory:", fixture_access=True, admin_token="test-analyst")
     app = create_app(settings, httpx.MockTransport(handler))
     async with (
         app.router.lifespan_context(app),

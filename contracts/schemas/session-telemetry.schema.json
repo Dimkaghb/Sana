@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:sana-shield:contract:A:1.0.0",
+  "$id": "urn:sana-shield:contract:A:1.1.0",
   "title": "SessionTelemetryPayload",
   "type": "object",
   "description": "Contract A: SDK -> backend -> ML. Measurements use session-relative milliseconds, m/s^2, and orientation degrees.",
@@ -224,6 +224,51 @@
         "is_new_recipient"
       ],
       "additionalProperties": false
+    },
+    "contacts": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "down_ms",
+          "up_ms",
+          "field",
+          "pointer_type",
+          "is_trusted"
+        ],
+        "properties": {
+          "down_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "up_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "field": {
+            "enum": [
+              "recipient",
+              "amount",
+              "preset",
+                "review",
+              "recipient_type",
+              "slider"
+            ]
+          },
+          "pointer_type": {
+            "enum": [
+              "mouse",
+              "touch",
+              "pen"
+            ]
+          },
+          "is_trusted": {
+            "type": "boolean"
+          }
+        }
+      }
     }
   },
   "required": [

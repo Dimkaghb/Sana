@@ -1,11 +1,18 @@
-import { StrictMode } from "react";
+import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource-variable/geist/index.css";
 import "@fontsource-variable/manrope/index.css";
 import "./style.css";
-import { Dashboard } from "./views/Dashboard";
-import { Guardian } from "./views/Guardian";
-import { Mobile } from "./views/Mobile";
+import { WorkspaceAccess } from "./components/WorkspaceAccess";
+const Dashboard = lazy(() =>
+  import("./views/Dashboard").then((m) => ({ default: m.Dashboard })),
+);
+const Guardian = lazy(() =>
+  import("./views/Guardian").then((m) => ({ default: m.Guardian })),
+);
+const Mobile = lazy(() =>
+  import("./views/Mobile").then((m) => ({ default: m.Mobile })),
+);
 const route = location.pathname.replace(/\/$/, "");
 document.documentElement.lang = route === "/mobile" ? "ru" : "en";
 document.title =
@@ -17,12 +24,24 @@ document.title =
   )[route] || "Command Center · SANA Shield";
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    {route === "/mobile" ? (
-      <Mobile />
-    ) : route === "/guardian" ? (
-      <Guardian />
-    ) : (
-      <Dashboard />
-    )}
+    <Suspense
+      fallback={
+        <p role="status" className="empty-row">
+          {route === "/mobile" ? "Загрузка…" : "Loading workspace…"}
+        </p>
+      }
+    >
+      {route === "/mobile" ? (
+        <WorkspaceAccess role="mobile">
+          {(alias) => <Mobile alias={alias} />}
+        </WorkspaceAccess>
+      ) : route === "/guardian" ? (
+        <Guardian />
+      ) : (
+        <WorkspaceAccess role="analyst">
+          {(alias) => <Dashboard alias={alias} />}
+        </WorkspaceAccess>
+      )}
+    </Suspense>
   </StrictMode>,
 );

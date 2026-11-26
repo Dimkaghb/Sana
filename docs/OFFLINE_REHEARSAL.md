@@ -14,7 +14,7 @@ python -m scripts.stage --bind 192.168.1.15 --origin https://192.168.1.15:8443 \
   --cert /path/to/stage-cert.pem --key /path/to/stage-key.pem
 ```
 
-5. Open `/mobile` on the transfer phone, `/dashboard` on the projector laptop, and `/guardian` on the second phone at that HTTPS origin. Keep analyst and Guardian credentials with their intended operators. Confirm there are no certificate warnings. Grant requested motion access through the phone's activation button.
+5. Open `/mobile` on the transfer phone, `/dashboard` on the projector laptop, and `/guardian` on the second phone at that HTTPS origin. Provision the mobile and analyst logins in the stage database with `python -m backend.accounts mobile acc_student_101` and `python -m backend.accounts analyst analyst`. Use the same `SANA_DB` for provisioning and serving. Each command prompts for its password. Sign in on the corresponding device. Keep Guardian credentials with their intended operators. Confirm there are no certificate warnings. Grant requested motion access through the phone's activation button.
 6. Disconnect internet access while keeping the local Wi-Fi link active. Reload each view. Check that assets render, sockets connect, and the phone reports an actual sampling rate or identifies unavailable motion.
 
 ## Prepare the owner baseline

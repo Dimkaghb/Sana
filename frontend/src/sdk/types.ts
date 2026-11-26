@@ -43,6 +43,19 @@ export interface SessionTelemetry {
   started_at_ms: number;
   duration_ms: number;
   keystrokes: KeySample[];
+  contacts?: {
+    down_ms: number;
+    up_ms: number;
+    field:
+      | "recipient"
+      | "amount"
+      | "preset"
+      | "review"
+      | "recipient_type"
+      | "slider";
+    pointer_type: "mouse" | "touch" | "pen";
+    is_trusted: boolean;
+  }[];
   taps: Tap[];
   slider_trace: SliderPoint[];
   imu_samples: MotionSample[];

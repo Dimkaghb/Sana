@@ -32,7 +32,7 @@ export function PopulationMap({
         byId.set(dot.session_id || "map-" + i, dot);
     }
     for (const e of data?.events || []) {
-      if (!e.map_point) continue;
+      if (!e.map_point || (data?.population_map && "next" in data.population_map && !byId.has(e.session_id))) continue;
       const stored = byId.get(e.session_id);
       byId.set(e.session_id, {
         ...e.map_point,
@@ -54,12 +54,12 @@ export function PopulationMap({
     py = (y: number) => 230 - ((y - minY) / (maxY - minY)) * 190;
   const color = (status: string) =>
     status === "UNVERIFIED"
-      ? "#9faea7"
+      ? "var(--muted)"
       : /CRITICAL|HOLD|BANNED/i.test(status)
-        ? "#ff816b"
+        ? "var(--critical)"
         : /DRIFT|STRESS|WARN|STEP/i.test(status)
-          ? "#f7be6d"
-          : "#5bdfae";
+          ? "var(--warning)"
+          : "var(--success)";
   const clusters = new Map<number, Dot[]>();
   dots
     .filter((dot) => dot.cluster_id >= 0)
@@ -72,7 +72,7 @@ export function PopulationMap({
     <section className="panel map-panel">
       <header className="panel-head">
         <div>
-          <p className="eyebrow">VECTOR INTELLIGENCE</p>
+          <p className="projection-name">UMAP · 2D projection</p>
           <h2>Behavioral population map</h2>
         </div>
         <LocateFixed size={20} />
@@ -90,7 +90,7 @@ export function PopulationMap({
               height="12"
               patternUnits="userSpaceOnUse"
             >
-              <circle cx="2" cy="2" r="0.8" fill="#465e53" />
+              <circle cx="2" cy="2" r="0.8" fill="#c1ccda" />
             </pattern>
             <pattern
               id="grid"
@@ -101,7 +101,7 @@ export function PopulationMap({
               <path
                 d="M 60 0 L 0 0 0 60"
                 fill="none"
-                stroke="#668271"
+                stroke="#adbccc"
                 strokeWidth=".4"
               />
             </pattern>
@@ -110,7 +110,7 @@ export function PopulationMap({
           <rect width="700" height="270" fill="url(#grid)" />
           <path
             d="M350 0v270M0 135h700"
-            stroke="#597066"
+            stroke="#98a9bd"
             strokeDasharray="3 7"
             opacity=".65"
           />
@@ -128,9 +128,9 @@ export function PopulationMap({
                   cy={cy}
                   rx={rx}
                   ry={ry}
-                  fill="#5bdfae"
+                  fill="var(--success)"
                   fillOpacity=".035"
-                  stroke="#67b789"
+                  stroke="#55779c"
                   strokeOpacity=".28"
                   strokeDasharray="3 4"
                 />
@@ -138,7 +138,7 @@ export function PopulationMap({
                   x={cx}
                   y={Math.max(10, cy - ry - 4)}
                   textAnchor="middle"
-                  fill="#9eb4a5"
+                  fill="var(--muted)"
                   fontSize="8"
                 >
                   {"C" + id + " · " + group.length}
@@ -179,7 +179,7 @@ export function PopulationMap({
                 cy={py(dot.y)}
                 r={selected && selected === dot.session_id ? 8 : 4}
                 fill={color(dot.status)}
-                stroke={dot.synthetic ? color(dot.status) : "#14261e"}
+                stroke={dot.synthetic ? color(dot.status) : "#fff"}
                 fillOpacity={dot.synthetic ? 0.35 : 1}
                 strokeWidth="1"
               />
@@ -209,7 +209,7 @@ export function PopulationMap({
             Critical
           </span>
           <span>
-            <i style={{ background: "#9faea7" }} />
+            <i style={{ background: "var(--muted)" }} />
             Unverified
           </span>
         </div>
@@ -259,8 +259,8 @@ export function Waveform({ event }: { event?: DashboardEvent }) {
             " meters per second squared"
           }
         >
-          <path d="M0 50h310" stroke="#395448" strokeDasharray="3 4" />
-          <path d={path} fill="none" stroke="#65dfae" strokeWidth="2" />
+          <path d="M0 50h310" stroke="#c1ccda" strokeDasharray="3 4" />
+          <path d={path} fill="none" stroke="var(--navy)" strokeWidth="2" />
         </svg>
       ) : (
         <p>Waveform unavailable</p>

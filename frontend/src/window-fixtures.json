@@ -1,0 +1,366 @@
+{
+  "sess_fixture_banned_operator": [
+    {
+      "start_ms": 0,
+      "end_ms": 2000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": 0.003377,
+      "travel": null,
+      "key_interval": 0.16875
+    },
+    {
+      "start_ms": 1000,
+      "end_ms": 3000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": 0.00279,
+      "travel": null,
+      "key_interval": 0.163333
+    },
+    {
+      "start_ms": 2000,
+      "end_ms": 4000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.001629,
+      "travel": 1.0,
+      "key_interval": null
+    },
+    {
+      "start_ms": 3000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.00123,
+      "travel": 0.918374,
+      "key_interval": null
+    },
+    {
+      "start_ms": 4000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.00046,
+      "travel": 0.755123,
+      "key_interval": null
+    }
+  ],
+  "sess_fixture_handoff": [
+    {
+      "start_ms": 0,
+      "end_ms": 2000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": 0.003377,
+      "travel": null,
+      "key_interval": 0.16875
+    },
+    {
+      "start_ms": 1000,
+      "end_ms": 3000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": 0.00279,
+      "travel": null,
+      "key_interval": 0.163333
+    },
+    {
+      "start_ms": 2000,
+      "end_ms": 4000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.001629,
+      "travel": 1.0,
+      "key_interval": null
+    },
+    {
+      "start_ms": 3000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.00123,
+      "travel": 0.918374,
+      "key_interval": null
+    },
+    {
+      "start_ms": 4000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.00046,
+      "travel": 0.755123,
+      "key_interval": null
+    }
+  ],
+  "sess_fixture_missing_sensors": [
+    {
+      "start_ms": 0,
+      "end_ms": 2000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": null,
+      "travel": null,
+      "key_interval": 0.16875
+    },
+    {
+      "start_ms": 1000,
+      "end_ms": 3000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": null,
+      "travel": null,
+      "key_interval": 0.163333
+    },
+    {
+      "start_ms": 2000,
+      "end_ms": 4000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": null,
+      "travel": 1.0,
+      "key_interval": null
+    },
+    {
+      "start_ms": 3000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": null,
+      "travel": 0.918374,
+      "key_interval": null
+    },
+    {
+      "start_ms": 4000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": null,
+      "travel": 0.755123,
+      "key_interval": null
+    }
+  ],
+  "sess_fixture_dictation": [
+    {
+      "start_ms": 0,
+      "end_ms": 2000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": 0.002823,
+      "travel": null,
+      "key_interval": 0.233333
+    },
+    {
+      "start_ms": 1000,
+      "end_ms": 3000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": 0.00224,
+      "travel": null,
+      "key_interval": 0.075
+    },
+    {
+      "start_ms": 2000,
+      "end_ms": 4000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.004014,
+      "travel": 1.0,
+      "key_interval": 0.19375
+    },
+    {
+      "start_ms": 3000,
+      "end_ms": 4500,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.003568,
+      "travel": 0.918374,
+      "key_interval": 0.075
+    },
+    {
+      "start_ms": 4000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.00046,
+      "travel": 0.755123,
+      "key_interval": null
+    }
+  ],
+  "sess_fixture_synthetic_touch": [
+    {
+      "start_ms": 0,
+      "end_ms": 2000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": 0.0,
+      "travel": null,
+      "key_interval": 0.16875
+    },
+    {
+      "start_ms": 1000,
+      "end_ms": 3000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": 0.0,
+      "travel": null,
+      "key_interval": 0.163333
+    },
+    {
+      "start_ms": 2000,
+      "end_ms": 4000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": 0.0,
+      "motion": 0.0,
+      "travel": 1.0,
+      "key_interval": null
+    },
+    {
+      "start_ms": 3000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.0,
+      "motion": 0.0,
+      "travel": 1.0,
+      "key_interval": null
+    },
+    {
+      "start_ms": 4000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.0,
+      "motion": 0.0,
+      "travel": 1.0,
+      "key_interval": null
+    }
+  ],
+  "sess_fixture_normal": [
+    {
+      "start_ms": 0,
+      "end_ms": 2000,
+      "key_dwell": 0.085,
+      "contact_dwell": 0.085,
+      "pressure": null,
+      "motion": 0.003377,
+      "travel": null,
+      "key_interval": 0.16875
+    },
+    {
+      "start_ms": 1000,
+      "end_ms": 3000,
+      "key_dwell": 0.085,
+      "contact_dwell": 0.085,
+      "pressure": null,
+      "motion": 0.00279,
+      "travel": null,
+      "key_interval": 0.163333
+    },
+    {
+      "start_ms": 2000,
+      "end_ms": 4000,
+      "key_dwell": 0.085,
+      "contact_dwell": 0.085,
+      "pressure": 0.5,
+      "motion": 0.001629,
+      "travel": 1.0,
+      "key_interval": null
+    },
+    {
+      "start_ms": 3000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.00123,
+      "travel": 0.918374,
+      "key_interval": null
+    },
+    {
+      "start_ms": 4000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.00046,
+      "travel": 0.755123,
+      "key_interval": null
+    }
+  ],
+  "sess_fixture_ring": [
+    {
+      "start_ms": 0,
+      "end_ms": 2000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": 0.003377,
+      "travel": null,
+      "key_interval": 0.16875
+    },
+    {
+      "start_ms": 1000,
+      "end_ms": 3000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": null,
+      "motion": 0.00279,
+      "travel": null,
+      "key_interval": 0.163333
+    },
+    {
+      "start_ms": 2000,
+      "end_ms": 4000,
+      "key_dwell": 0.085,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.001629,
+      "travel": 1.0,
+      "key_interval": null
+    },
+    {
+      "start_ms": 3000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.00123,
+      "travel": 0.918374,
+      "key_interval": null
+    },
+    {
+      "start_ms": 4000,
+      "end_ms": 4500,
+      "key_dwell": null,
+      "contact_dwell": null,
+      "pressure": 0.5,
+      "motion": 0.00046,
+      "travel": 0.755123,
+      "key_interval": null
+    }
+  ]
+}

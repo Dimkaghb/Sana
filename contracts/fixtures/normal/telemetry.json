@@ -4,6 +4,14 @@
   "device_meta": {"screen_w":390,"screen_h":844,"os":"iOS","sample_rate_hz":60},
   "started_at_ms": 1795702915000,
   "duration_ms": 4500,
+  "contacts": [
+    {"down_ms":500,"up_ms":585,"field":"recipient","pointer_type":"touch","is_trusted":true},
+    {"down_ms":820,"up_ms":905,"field":"recipient","pointer_type":"touch","is_trusted":true},
+    {"down_ms":1210,"up_ms":1295,"field":"recipient","pointer_type":"touch","is_trusted":true},
+    {"down_ms":1490,"up_ms":1575,"field":"recipient","pointer_type":"touch","is_trusted":true},
+    {"down_ms":1850,"up_ms":1935,"field":"recipient","pointer_type":"touch","is_trusted":true},
+    {"down_ms":2190,"up_ms":2275,"field":"recipient","pointer_type":"touch","is_trusted":true}
+  ],
   "keystrokes": [
     {"key_group":"digit","down_ms":500,"up_ms":585,"dx_norm":0.04,"dy_norm":-0.02},
     {"key_group":"digit","down_ms":820,"up_ms":905,"dx_norm":0.04,"dy_norm":-0.02},
