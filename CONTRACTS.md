@@ -1,6 +1,6 @@
 # Shared data contracts
 
-**Version 1.1.0.** Source: PRD section 3 (pages 2-4), with Person Two behavior on pages 6-7. Field names and nesting are preserved. Schemas describe the complete PRD example shapes; operational extensions remain explicitly open below.
+**Version 1.1.0.** Source: PRD section 3 (pages 2-4), with Person Two behavior on pages 6-7. Field names and nesting are preserved. Schemas preserve the PRD example shapes and document the runtime extensions below.
 
 Do not silently alter fields. Update schemas, this document, affected fixtures, and consumers together. Sample values are examples, not fixed constants unless explicitly stated (128 dimensions, event type, and decision modes).
 
@@ -37,6 +37,8 @@ JSON Schema validates shapes/ranges. The repository validator additionally check
 | `ax`, `ay`, `az` | Gravity-removed acceleration in m/s^2 |
 | `alpha`, `beta`, `gamma` | Orientation angles in degrees, not angular velocity |
 | `transfer_context` | Nonnegative amount in KZT and whether recipient is new; no recipient digits/details |
+
+In the browser SDK each IMU record corresponds to a motion event. Its angles come from the last complete orientation event in the current uninterrupted visible collection period. Browsers can report orientation on change. Contract A carries the motion timestamp and does not carry the original angle timestamp. If no valid orientation is available, the SDK omits that IMU record.
 
 Each stream is ordered by its timestamps; paired key-up cannot precede key-down. The SDK stores at most the last 20 seconds of IMU. Earlier tap records cannot receive a recoil conclusion without overlapping retained data.
 

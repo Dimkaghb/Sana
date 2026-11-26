@@ -45,6 +45,10 @@ function osLabel() {
   return "Desktop";
 }
 
+export interface KinetiqConfig {
+  accountId: string;
+  collectMotion: boolean;
+}
 export class KinetiqSDK {
   readonly sessionId =
     typeof crypto.randomUUID === "function"
@@ -59,11 +63,12 @@ export class KinetiqSDK {
   private readonly taps: Tap[] = [];
   private readonly keys: KeySample[] = [];
   private readonly sliders: SliderPoint[] = [];
-  private readonly motion: MotionSample[] = [];
+  private readonly motion: (MotionSample | undefined)[] = [];
   private motionHead = 0;
+  private motionCount = 0;
   private readonly touches = new Map<number, Omit<KeySample, "up_ms">>();
   private slider?: number;
-  private orientation?: Pick<MotionSample, "alpha" | "beta" | "gamma" | "t_ms">;
+  private orientation?: Pick<MotionSample, "alpha" | "beta" | "gamma">;
   private frozen?: SessionTelemetry;
   private sending?: Promise<Decision>;
   private socket?: WebSocket;
@@ -71,10 +76,32 @@ export class KinetiqSDK {
   private delay?: ReturnType<typeof setTimeout>;
   private running = false;
 
-  constructor(readonly accountId: string) {}
+  readonly accountId: string;
+  private readonly collectMotion: boolean;
+  constructor(config: KinetiqConfig | string) {
+    this.accountId = typeof config === "string" ? config : config.accountId;
+    this.collectMotion = typeof config === "string" || config.collectMotion;
+  }
+  private pruneMotion(cutoff: number) {
+    while (this.motionCount) {
+      const oldest = (this.motionHead - this.motionCount + 4096) % 4096;
+      const sample = this.motion[oldest];
+      if (sample && sample.t_ms >= cutoff) break;
+      this.motion[oldest] = undefined;
+      this.motionCount--;
+    }
+  }
 
-  private time() {
-    return performance.now() - this.started;
+  private time(event?: Event) {
+    const now = performance.now();
+    if (!event || !finite(event.timeStamp) || event.timeStamp <= 0)
+      return now - this.started;
+    // Legacy WebKit timestamps may use Unix milliseconds instead of timeOrigin.
+    const stamp =
+      event.timeStamp > 1e12
+        ? event.timeStamp - performance.timeOrigin
+        : event.timeStamp;
+    return clamp(stamp - this.started, 0, now - this.started);
   }
 
   start(onDemoClick?: () => void) {
@@ -85,41 +112,7 @@ export class KinetiqSDK {
       capture: true,
       passive: true,
     };
-    window.addEventListener(
-      "deviceorientation",
-      (event) => {
-        if (finite(event.alpha) && finite(event.beta) && finite(event.gamma)) {
-          this.orientation = {
-            alpha: event.alpha,
-            beta: event.beta,
-            gamma: event.gamma,
-            t_ms: this.time(),
-          };
-        }
-      },
-      options,
-    );
-    window.addEventListener(
-      "devicemotion",
-      (event) => {
-        const a = event.acceleration;
-        const angle = this.orientation;
-        const t = this.time();
-        if (
-          !a ||
-          !angle ||
-          t - angle.t_ms > 250 ||
-          !finite(a.x) ||
-          !finite(a.y) ||
-          !finite(a.z)
-        )
-          return;
-        const sample = { ...angle, t_ms: t, ax: a.x, ay: a.y, az: a.z };
-        this.motion[this.motionHead] = sample;
-        this.motionHead = (this.motionHead + 1) % 4096;
-      },
-      options,
-    );
+    if (this.collectMotion) this.listenForMotion(options);
     document.addEventListener(
       "pointerdown",
       (e) => {
@@ -174,8 +167,9 @@ export class KinetiqSDK {
       (e) => {
         this.trace(e);
         const key = this.touches.get(e.pointerId);
-        if (key && this.keys.length < 512)
-          this.keys.push({ ...key, up_ms: this.time() });
+        const released = this.time(e);
+        if (key && released >= key.down_ms && this.keys.length < 512)
+          this.keys.push({ ...key, up_ms: released });
         this.release(e.pointerId);
       },
       options,
@@ -188,9 +182,92 @@ export class KinetiqSDK {
     if (onDemoClick) this.connect(onDemoClick);
   }
 
+  private listenForMotion(options: AddEventListenerOptions) {
+    let permissionLost = false;
+    let lastMotionTime = -1;
+    let orientationTime = -1;
+    // Browser support for querying individual sensor permissions varies.
+    for (const name of ["accelerometer", "gyroscope"]) {
+      navigator.permissions
+        ?.query({ name: name as PermissionName })
+        .then((status) => {
+          if (this.events.signal.aborted) return;
+          const check = () => {
+            if (status.state !== "denied") return;
+            permissionLost = true;
+            this.orientation = undefined;
+            this.motion.length = 0;
+            this.motionHead = this.motionCount = 0;
+          };
+          check();
+          status.addEventListener("change", check, {
+            signal: this.events.signal,
+          });
+        })
+        .catch(() => {
+          /* Permission remains governed by browser event delivery. */
+        });
+    }
+    // Browsers can publish orientation only on change while motion is periodic.
+    // Keep the last observed attitude valid only within the same visible session.
+    document.addEventListener(
+      "visibilitychange",
+      () => {
+        this.orientation = undefined;
+        this.touches.clear();
+        this.slider = undefined;
+      },
+      options,
+    );
+    window.addEventListener(
+      "deviceorientation",
+      (event) => {
+        if (!event.isTrusted || document.hidden || permissionLost) return;
+        orientationTime = this.time(event);
+        if (finite(event.alpha) && finite(event.beta) && finite(event.gamma)) {
+          this.orientation = {
+            alpha: event.alpha,
+            beta: event.beta,
+            gamma: event.gamma,
+          };
+        } else {
+          this.orientation = undefined;
+        }
+      },
+      options,
+    );
+    window.addEventListener(
+      "devicemotion",
+      (event) => {
+        const a = event.acceleration;
+        const angle = this.orientation;
+        const t = this.time(event);
+        if (
+          !event.isTrusted ||
+          permissionLost ||
+          t < orientationTime ||
+          t <= lastMotionTime ||
+          !a ||
+          !angle ||
+          document.hidden ||
+          !finite(a.x) ||
+          !finite(a.y) ||
+          !finite(a.z)
+        )
+          return;
+        lastMotionTime = t;
+        const sample = { ...angle, t_ms: t, ax: a.x, ay: a.y, az: a.z };
+        this.pruneMotion(t - 20000);
+        this.motion[this.motionHead] = sample;
+        this.motionCount = Math.min(4096, this.motionCount + 1);
+        this.motionHead = (this.motionHead + 1) % 4096;
+      },
+      options,
+    );
+  }
   private position(e: PointerEvent) {
     return {
-      t_ms: this.time(),
+      t_ms: this.time(e),
       x_norm: clamp(e.clientX / Math.max(innerWidth, 1)),
       y_norm: clamp(e.clientY / Math.max(innerHeight, 1)),
     };
@@ -238,10 +315,13 @@ export class KinetiqSDK {
   }
   snapshot(context: TransferContext): SessionTelemetry {
     const duration = this.time();
-    const ordered = this.motion
-      .slice(this.motionHead)
-      .concat(this.motion.slice(0, this.motionHead));
-    const samples = ordered.filter((sample) => sample.t_ms >= duration - 20000);
+    this.pruneMotion(duration - 20000);
+    const samples: MotionSample[] = [];
+    const first = (this.motionHead - this.motionCount + 4096) % 4096;
+    for (let offset = 0; offset < this.motionCount; offset++) {
+      const sample = this.motion[(first + offset) % 4096];
+      if (sample) samples.push({ ...sample });
+    }
     const span =
       samples.length > 1 ? samples.at(-1)!.t_ms - samples[0].t_ms : 0;
     return {
@@ -255,12 +335,14 @@ export class KinetiqSDK {
         os: osLabel(),
         sample_rate_hz: span > 0 ? ((samples.length - 1) * 1000) / span : 0,
       },
-      taps: this.taps.map((t) => ({ ...t })),
-      slider_trace: this.sliders.map((t) => ({ ...t })),
+      taps: this.taps.map((t) => ({ ...t })).sort((a, b) => a.t_ms - b.t_ms),
+      slider_trace: this.sliders
+        .map((t) => ({ ...t }))
+        .sort((a, b) => a.t_ms - b.t_ms),
       keystrokes: this.keys
         .map((t) => ({ ...t }))
         .sort((a, b) => a.down_ms - b.down_ms),
-      imu_samples: span > 0 ? samples.map((t) => ({ ...t })) : [],
+      imu_samples: span > 0 ? samples : [],
       transfer_context: {
         amount_kzt: context.amount_kzt,
         is_new_recipient: context.is_new_recipient,
@@ -346,6 +428,7 @@ export class KinetiqSDK {
       this.sliders.length =
       this.taps.length =
         0;
+    this.motionCount = 0;
     this.frozen = this.orientation = undefined;
   }
 }
