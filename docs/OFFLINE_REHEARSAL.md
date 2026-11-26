@@ -17,6 +17,10 @@ python -m scripts.stage --bind 192.168.1.15 --origin https://192.168.1.15:8443 \
 5. Open `/mobile` on the transfer phone, `/dashboard` on the projector laptop, and `/guardian` on the second phone at that HTTPS origin. Keep analyst and Guardian credentials with their intended operators. Confirm there are no certificate warnings. Grant requested motion access through the phone's activation button.
 6. Disconnect internet access while keeping the local Wi-Fi link active. Reload each view. Check that assets render, sockets connect, and the phone reports an actual sampling rate or identifies unavailable motion.
 
+## Prepare the owner baseline
+
+In live mode, a new account starts with unavailable owner evidence. Have the verified owner perform three separate transfers with sensor coverage. In the dashboard open each eligible session, enter the analyst credential, and explicitly attest ownership. The original receipts remain unchanged. Use a subsequent transfer to demonstrate owner verification. A session with a hold, conflicting identity, or inadequate evidence is ineligible for enrollment.
+
 ## Three-minute demonstration
 
 | Time | Presenter action | Evidence to inspect |

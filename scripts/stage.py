@@ -40,6 +40,10 @@ def build_app(dist: Path):
     return app
 
 
+def local_app():
+    return build_app(ROOT / "frontend/dist")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--origin", required=True, help="HTTPS origin used by both phones, including port")

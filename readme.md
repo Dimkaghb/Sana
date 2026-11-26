@@ -2,6 +2,16 @@
 
 A simulated BCC transfer app, analyst dashboard, and Guardian view backed by physical-interaction checks and a separate behavioral identity service.
 
+## Start a complete rehearsal
+
+After installing the backend and ML environments and running `npm ci && npm run build` in `frontend/`, start both services and the built web app from the repository root:
+
+```sh
+.venv/bin/python -m scripts.rehearse --mode live
+```
+
+Open the printed dashboard, mobile, and Guardian URLs. Each run creates a new private local directory for its databases and a mode-0600 access file containing the analyst and Guardian demo credentials. Ctrl-C stops both services. Use `--mode mock` for a fixture rehearsal without installing ML. Use the [offline LAN instructions](docs/OFFLINE_REHEARSAL.md) to run on actual phones. A [60-second software rehearsal](docs/demo/software-rehearsal.mp4) is available for projector backup.
+
 ## Run locally
 
 Use Python 3.12 for the backend and ML environments. From the repository root:
