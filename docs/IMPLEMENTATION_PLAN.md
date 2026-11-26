@@ -131,3 +131,9 @@ The PRD schedule is aggressive, not a completion guarantee. Protect the complete
 The browser SDK now pairs capped pointer down/up observations with a whitelisted field and pointer type. The backend dossier and version 2 ML encoder share a bounded window implementation. Tests exercise overlap, missing channels, compatibility with old recordings, window influence on the normalized embedding, account spoof rejection, sign-out, pagination, snapshot recovery and backfill of dashboard totals. The phone and console each remember their theme. Local rehearsal generates separate credentials for each account and the analyst.
 
 The latest run passed 21 shared contract/window tests, 17 backend tests, seven ML tests and nine browser tests, plus the seven-scenario HTTP/WebSocket rehearsal and the live enrollment, ring and ban check. Database evidence comes from local SQLite and embedded Qdrant. Deployment capacity, physical handset performance and participant accuracy still need measurements.
+
+## Three-dimensional population view
+
+Verified the dashboard volume against the existing local rehearsal with 150 seeded sessions and one live submission. All 151 points received three PCA coordinates derived from their stored embeddings. The production build, 21 shared tests, 17 backend tests, seven ML tests and ten browser tests passed. The browser check exercised the live view at desktop and phone widths.
+
+The analyst now explores the three-dimensional projection from a first-person camera. The live rehearsal showed 18 numbered groups for 143 grouped sessions and listed eight ungrouped sessions separately. Selecting a group reveals its member sessions. At 1500 px and 390 px browser widths, all 18 overview markers were visible and individually selectable by center-point hit testing. The production build and all ten browser tests passed.

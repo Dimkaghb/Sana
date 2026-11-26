@@ -14,7 +14,7 @@ Vite proxies same-origin `/api` and `/ws` to the FastAPI backend at `127.0.0.1:8
 | Route | Use |
 | --- | --- |
 | `/dashboard` | Sign in as an analyst to view the service feed, flags and dossiers. Prepare a valid transfer on the phone, then select its connected session before sending the synthetic-click command. On eligible live sessions, the analyst can explicitly attest independent owner verification and enroll the session for future scoring. |
-| `/dashboard/map`, `/dashboard/signals`, `/dashboard/accounts` | Explore paged UMAP points, inspect normalized session windows, or search account aliases and review their transfers. |
+| `/dashboard/map`, `/dashboard/signals`, `/dashboard/accounts` | Move through a first-person 3D PCA projection and open a numbered behavior group to inspect its sessions, inspect normalized session windows, or search account aliases and review their transfers. |
 | `/mobile` | Sign in with a provisioned mobile alias, activate protection, enter at least four simulated recipient digits, and drag the slider. Keyboard users can focus the slider and press Enter. Grant browser motion access when prompted. |
 | `/guardian` | Sign in with the Guardian token for a single demo account. Visible holds are acknowledged. Freezing a transfer requires an explicit click. |
 | `/dashboard?mode=fixtures`, `/mobile?mode=fixtures`, `/guardian?mode=fixtures` | Explicit local fixture previews. A transfer fixture can be selected by scenario. |

@@ -37,6 +37,7 @@ export interface DashboardData {
   >;
   population_map: {
     points: (MapPoint & {
+      position_3d?: [number, number, number];
       session_id?: string;
       account_id?: string;
       synthetic?: boolean;

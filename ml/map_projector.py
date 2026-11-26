@@ -1,7 +1,10 @@
 """Stable out-of-sample projection and frozen density cluster assignments."""
 
 import numpy as np
+from functools import cached_property
+
 from sklearn.cluster import HDBSCAN
+from sklearn.decomposition import PCA
 from umap import UMAP
 
 
@@ -31,3 +34,12 @@ class MapProjector:
             xy = self.model.transform(vector[None, :])[0]
         cluster = int(self.clusters[nearest]) if scores[nearest] >= 0.80 else -1
         return {"x": float(xy[0]), "y": float(xy[1]), "cluster_id": cluster}
+
+    @cached_property
+    def space(self):
+        # Fit against the generation's fixed training vectors, including for
+        # projector artifacts created before the 3D population view existed.
+        return PCA(n_components=3, svd_solver="full").fit(self.reference)
+
+    def position_3d(self, vector):
+        return self.space.transform(np.asarray(vector).reshape(1, -1))[0].tolist()

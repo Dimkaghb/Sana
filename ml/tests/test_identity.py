@@ -130,6 +130,12 @@ class IdentityApiTests(unittest.TestCase):
             self.assertIsNone(page["next"])
             self.assertEqual(len(page["points"]), 5)
             store = http.app.state.store
+            point = next(p for p in page["points"] if p["session_id"] == "cross")
+            stored = store.get("global_sessions", "cross", "live")
+            np.testing.assert_allclose(point["position_3d"], store.projector.position_3d(stored.vector))
+            self.assertEqual(len(point["position_3d"]), 3)
+            training_cloud = store.projector.space.transform(store.projector.reference)
+            self.assertEqual(np.linalg.matrix_rank(training_cloud), 3)
             page1 = store.population_page(None, limit=2)
             page2 = store.population_page(page1["next"], limit=2)
             self.assertTrue(

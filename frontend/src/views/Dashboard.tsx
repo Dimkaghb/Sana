@@ -481,6 +481,7 @@ export function Dashboard({ alias }: { alias?: string }) {
             <PopulationMap
               data={data}
               selected={selected}
+              preview={preview}
               onSelect={(d) => {
                 setDot(d);
                 setSelected(d.session_id);

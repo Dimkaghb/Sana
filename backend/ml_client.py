@@ -41,10 +41,15 @@ def valid_population(result):
             else:
                 labels = ("session_id", "account_id", "operator_id", "status")
                 if (
-                    set(row) != {"x", "y", "cluster_id", "synthetic", *labels}
+                    (set(row) - {"position_3d"}) != {"x", "y", "cluster_id", "synthetic", *labels}
                     or type(row["synthetic"]) is not bool
                 ):
                     return False
+                if "position_3d" in row:
+                    xyz = row["position_3d"]
+                    if (not isinstance(xyz, list) or len(xyz) != 3
+                            or any(type(n) not in (int, float) or not math.isfinite(n) for n in xyz)):
+                        return False
                 if any(
                     not isinstance(row[k], str) or not row[k] or len(row[k]) > 128
                     for k in labels

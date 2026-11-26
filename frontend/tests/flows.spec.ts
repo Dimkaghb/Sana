@@ -202,6 +202,7 @@ test("population view preserves current ban status over the historical session s
     session_id: event.session_id,
     account_id: event.account_id,
     status: "BANNED",
+    position_3d: [0.1, 0.2, -0.4],
     synthetic: true,
   };
   await page.route("**/api/v1/dashboard/init*", (r) =>
@@ -225,10 +226,54 @@ test("population view preserves current ban status over the historical session s
     .getByRole("button", { name: "Population map", exact: true })
     .click();
   await page
+    .getByRole("button", {
+      name: "Group " + dot.cluster_id + " 1 session",
+      exact: true,
+    })
+    .click();
+  await page
     .getByRole("button", { name: "Inspect " + dot.operator_id, exact: true })
     .click();
   await expect(page.getByText("Operator status · banned")).toBeVisible();
   await expect(page.getByText("Synthetic seed session")).toBeVisible();
+});
+
+test("population map separates overlapping sessions and supports keyboard exploration", async ({
+  page,
+}) => {
+  await page.goto("/dashboard/map?mode=fixtures");
+  const plot = page.getByRole("group", { name: "Behavioral similarity plot" });
+  await expect(plot.getByRole("button")).toHaveCount(2);
+  const group = plot.getByRole("button", {
+    name: "Explore Group 1, 5 sessions",
+  });
+  const initial = await group.getAttribute("transform");
+  await plot.press("ArrowRight");
+  await expect(group).not.toHaveAttribute("transform", initial!);
+  await page.getByRole("button", { name: "Reset view" }).click();
+  await expect(group).toHaveAttribute("transform", initial!);
+  await plot.press("w");
+  await expect(group).not.toHaveAttribute("transform", initial!);
+  await page.getByRole("button", { name: "Reset view" }).click();
+  await group.press("Enter");
+
+  const stack = plot.getByRole("button", {
+    name: "Inspect 2 overlapping sessions",
+  });
+  await stack.press("Enter");
+  const browser = page.getByRole("complementary", {
+    name: "Behavior groups and sessions",
+  });
+  await expect(
+    browser.getByRole("heading", { name: "Overlapping sessions" }),
+  ).toBeVisible();
+  await expect(browser.getByRole("listitem")).toHaveCount(2);
+  await page.getByRole("button", { name: "Return to group overview" }).click();
+  await browser.getByRole("button", { name: "Group 1 5 sessions" }).click();
+  await page.getByRole("button", { name: "Normal 1" }).click();
+  await expect(browser.getByRole("listitem")).toHaveCount(1);
+  await browser.getByRole("button", { name: /sess_fixture_normal/ }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
 });
 
 test("clean live session enrollment requires independent verification and analyst token", async ({

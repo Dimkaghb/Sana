@@ -1,3 +1,4 @@
+import fixturePositions from "./fixture-positions.json";
 import type { Decision } from "./sdk";
 import type { DashboardData, DashboardEvent } from "./types";
 const files = import.meta.glob<DashboardEvent>(
@@ -11,7 +12,24 @@ export const fixtureData: DashboardData = {
   events: fixtureEvents,
   ml_mode: "mock",
   active_sessions: [],
-  population_map: null,
+  population_map: {
+    points: fixtureEvents.flatMap((event) => {
+      if (!event.map_point) return [];
+      const xyz =
+        fixturePositions[event.session_id as keyof typeof fixturePositions];
+      if (!xyz) return [];
+      return [
+        {
+          ...event.map_point,
+          session_id: event.session_id,
+          account_id: event.account_id,
+          synthetic: true,
+          position_3d: [xyz[0], xyz[1], xyz[2]] as [number, number, number],
+        },
+      ];
+    }),
+    clusters: [],
+  },
   kpis: {
     sessions: fixtureEvents.length,
     held_amount_kzt: 0,

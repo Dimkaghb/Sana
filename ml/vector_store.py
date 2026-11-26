@@ -306,7 +306,7 @@ class IdentityStore:
     def population_map(self):
         with self.lock:
             banned = {p.payload["operator_id"] for p in self.scroll("banned_operators")}
-            return self.projected_rows(self.scroll("global_sessions"), banned)
+            return self.projected_rows(self.scroll("global_sessions", vectors=True), banned)
 
     def population_page(self, cursor, limit=250):
         with self.lock:
@@ -314,7 +314,7 @@ class IdentityStore:
                 self.prefix + "global_sessions",
                 offset=cursor,
                 limit=limit,
-                with_vectors=False,
+                with_vectors=True,
             )
             ids = {
                 point_id(row.payload["scope"], row.payload["operator_id"])
@@ -332,8 +332,7 @@ class IdentityStore:
             )
             return {**page, "next": str(following) if following is not None else None}
 
-    @staticmethod
-    def projected_rows(rows, banned):
+    def projected_rows(self, rows, banned):
         points, groups = [], {}
         for p in rows:
             row = p.payload
@@ -341,6 +340,7 @@ class IdentityStore:
             points.append(
                 {
                     **pt,
+                    "position_3d": self.projector.position_3d(p.vector),
                     **{k: row[k] for k in ("session_id", "account_id", "operator_id")},
                     "synthetic": row["scope"] == "synthetic",
                     "status": "BANNED"

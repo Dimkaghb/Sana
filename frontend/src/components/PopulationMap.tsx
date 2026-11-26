@@ -1,231 +1,359 @@
-import { useMemo } from "react";
-import { LocateFixed, Radio } from "lucide-react";
-import type { DashboardData, DashboardEvent } from "../types";
+import { useId, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  ChevronRight,
+  Layers3,
+  Network,
+} from "lucide-react";
+import {
+  decisionLabel,
+  type DashboardData,
+  type DashboardEvent,
+} from "../types";
+import { PopulationScene } from "./PopulationScene";
+import "./population-map.css";
 
-interface Dot {
-  x: number;
-  y: number;
-  status: string;
-  operator_id?: string;
-  session_id?: string;
-  account_id?: string;
-  cluster_id: number;
-  synthetic?: boolean;
-}
+type Dot = NonNullable<DashboardData["population_map"]>["points"][number];
 export type SelectedDot = Pick<
   Dot,
-  "operator_id" | "session_id" | "account_id" | "status" | "synthetic"
->;
+  "session_id" | "account_id" | "status" | "synthetic"
+> &
+  Partial<Pick<Dot, "operator_id">>;
+
+const statuses = ["Normal", "Elevated", "Critical", "Unverified"] as const;
+export type MapStatus = (typeof statuses)[number];
+
+function statusFor(status: string): MapStatus {
+  if (/CRITICAL|HOLD|BANNED/i.test(status)) return "Critical";
+  if (/DRIFT|STRESS|WARN|STEP|ELEVATED/i.test(status)) return "Elevated";
+  if (/NORMAL|SUCCESS/i.test(status)) return "Normal";
+  return "Unverified";
+}
+
+type Session = Dot & {
+  id: string;
+  label: string;
+  description?: string;
+  tone: MapStatus;
+};
+
+export type MapStack = {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  sessions: Session[];
+};
+
+function hasPosition(session: Session) {
+  return (
+    session.position_3d?.length === 3 &&
+    session.position_3d.every(Number.isFinite)
+  );
+}
+
+function groupMarker(group: number, members: Session[]): MapStack[] {
+  const plotted = members.filter(hasPosition);
+  if (group < 0 || !plotted.length) return [];
+  const center = [0, 0, 0];
+  for (const session of plotted) {
+    session.position_3d!.forEach((value, axis) => {
+      center[axis] += value;
+    });
+  }
+  return [
+    {
+      id: String(group),
+      x: center[0] / plotted.length,
+      y: center[1] / plotted.length,
+      z: center[2] / plotted.length,
+      sessions: members,
+    },
+  ];
+}
+
+function collectSessions(data?: DashboardData) {
+  const byId = new Map<string, Dot>();
+  const map = data?.population_map;
+  for (const [index, dot] of (map?.points ?? []).entries()) {
+    byId.set(dot.session_id ?? `point-${index}`, dot);
+  }
+  const events = new Map(
+    data?.events.map((event) => [event.session_id, event]),
+  );
+  for (const event of events.values()) {
+    if (!event.map_point) continue;
+    const stored = byId.get(event.session_id);
+    if (map && "next" in map && !stored) continue;
+    byId.set(event.session_id, {
+      ...event.map_point,
+      // Use the current model generation's position and cluster when available.
+      ...stored,
+      status:
+        stored?.status === "BANNED" ? stored.status : event.map_point.status,
+      session_id: event.session_id,
+      account_id: event.account_id,
+    });
+  }
+
+  return [...byId]
+    .filter(([, dot]) => Number.isFinite(dot.x) && Number.isFinite(dot.y))
+    .map(([id, dot]): Session => {
+      const event = events.get(id);
+      return {
+        ...dot,
+        id,
+        label: event?.account_label ?? dot.account_id ?? dot.operator_id ?? id,
+        description:
+          event && (event.flags[0]?.title ?? decisionLabel[event.decision]),
+        tone: statusFor(dot.status),
+      };
+    });
+}
+
+function sessionCount(count: number) {
+  return `${count} ${count === 1 ? "session" : "sessions"}`;
+}
+
+function groupLabel(group: number) {
+  return group < 0 ? "Ungrouped" : `Group ${group}`;
+}
+
 export function PopulationMap({
   data,
   selected,
+  preview,
   onSelect,
 }: {
   data?: DashboardData;
   selected?: string;
-  onSelect: (dot: Dot) => void;
+  preview: boolean;
+  onSelect: (dot: SelectedDot) => void;
 }) {
-  const dots = useMemo(() => {
-    const byId = new Map<string, Dot>();
-    for (const [i, dot] of (data?.population_map?.points || []).entries()) {
-      if (Number.isFinite(dot.x) && Number.isFinite(dot.y))
-        byId.set(dot.session_id || "map-" + i, dot);
+  const browserId = useId();
+  const sessions = useMemo(() => collectSessions(data), [data]);
+  const [filter, setFilter] = useState<MapStatus>();
+  const [group, setGroup] = useState<number>();
+  const [stackId, setStackId] = useState<string>();
+  const visible = filter
+    ? sessions.filter((session) => session.tone === filter)
+    : sessions;
+  const groups = new Map<number, Session[]>();
+  for (const session of visible) {
+    const members = groups.get(session.cluster_id) ?? [];
+    members.push(session);
+    groups.set(session.cluster_id, members);
+  }
+  const groupRows = [...groups].sort(
+    ([left, a], [right, b]) =>
+      Number(left < 0) - Number(right < 0) ||
+      b.length - a.length ||
+      left - right,
+  );
+  const groupSessions = group === undefined ? undefined : groups.get(group);
+  const overview = !groupSessions;
+  const markers = (() => {
+    if (!groupSessions)
+      return groupRows.flatMap(([id, members]) => groupMarker(id, members));
+    const locations = new Map<string, MapStack>();
+    for (const session of groupSessions) {
+      if (!hasPosition(session)) continue;
+      const [x, y, z] = session.position_3d!;
+      const id = [x, y, z].join(",");
+      const stack = locations.get(id) ?? { id, x, y, z, sessions: [] };
+      stack.sessions.push(session);
+      locations.set(id, stack);
     }
-    for (const e of data?.events || []) {
-      if (!e.map_point || (data?.population_map && "next" in data.population_map && !byId.has(e.session_id))) continue;
-      const stored = byId.get(e.session_id);
-      byId.set(e.session_id, {
-        ...e.map_point,
-        session_id: e.session_id,
-        account_id: e.account_id,
-        status: stored?.status === "BANNED" ? "BANNED" : e.map_point.status,
-        synthetic: stored?.synthetic,
-      });
-    }
-    return Array.from(byId.values());
-  }, [data]);
-  const xs = dots.map((d) => d.x),
-    ys = dots.map((d) => d.y);
-  const minX = Math.min(0, ...xs),
-    maxX = Math.max(1, ...xs),
-    minY = Math.min(0, ...ys),
-    maxY = Math.max(1, ...ys);
-  const px = (x: number) => 50 + ((x - minX) / (maxX - minX)) * 600,
-    py = (y: number) => 230 - ((y - minY) / (maxY - minY)) * 190;
-  const color = (status: string) =>
-    status === "UNVERIFIED"
-      ? "var(--muted)"
-      : /CRITICAL|HOLD|BANNED/i.test(status)
-        ? "var(--critical)"
-        : /DRIFT|STRESS|WARN|STEP/i.test(status)
-          ? "var(--warning)"
-          : "var(--success)";
-  const clusters = new Map<number, Dot[]>();
-  dots
-    .filter((dot) => dot.cluster_id >= 0)
-    .forEach((dot) => {
-      const group = clusters.get(dot.cluster_id) || [];
-      group.push(dot);
-      clusters.set(dot.cluster_id, group);
-    });
+    return [...locations.values()];
+  })();
+  const stackSessions = stackId
+    ? markers.find((marker) => marker.id === stackId)?.sessions
+    : undefined;
+  const detail = stackSessions ?? groupSessions;
+  function openGroup(next?: number) {
+    setStackId(undefined);
+    setGroup(next);
+  }
+  function changeFilter(next?: MapStatus) {
+    setStackId(undefined);
+    if (next && !groupSessions?.some((session) => session.tone === next))
+      setGroup(undefined);
+    setFilter(next);
+  }
+  const synthetic = sessions.filter((session) => session.synthetic).length;
+
   return (
-    <section className="panel map-panel">
-      <header className="panel-head">
+    <section
+      className="panel population-panel"
+      aria-labelledby="population-title"
+    >
+      <header className="population-header">
         <div>
-          <p className="projection-name">UMAP · 2D projection</p>
-          <h2>Behavioral population map</h2>
+          <h2 id="population-title">Embedding space</h2>
+          <p>
+            Explore groups of transfers with similar interaction patterns.
+            Select a group to see its sessions.
+          </p>
         </div>
-        <LocateFixed size={20} />
+        <span className="population-count">
+          <Network size={16} aria-hidden="true" />
+          {sessionCount(sessions.length)}
+        </span>
       </header>
-      <div className="map">
-        <svg
-          viewBox="0 0 700 270"
-          role="group"
-          aria-label="Behavioral embedding projection"
-        >
-          <defs>
-            <pattern
-              id="dots"
-              width="12"
-              height="12"
-              patternUnits="userSpaceOnUse"
-            >
-              <circle cx="2" cy="2" r="0.8" fill="#c1ccda" />
-            </pattern>
-            <pattern
-              id="grid"
-              width="60"
-              height="60"
-              patternUnits="userSpaceOnUse"
-            >
-              <path
-                d="M 60 0 L 0 0 0 60"
-                fill="none"
-                stroke="#adbccc"
-                strokeWidth=".4"
-              />
-            </pattern>
-          </defs>
-          <rect width="700" height="270" fill="url(#dots)" />
-          <rect width="700" height="270" fill="url(#grid)" />
-          <path
-            d="M350 0v270M0 135h700"
-            stroke="#98a9bd"
-            strokeDasharray="3 7"
-            opacity=".65"
+      <div className="population-layout">
+        <a className="population-skip" href={`#${browserId}`}>
+          Skip to behavior groups
+        </a>
+        <div className="population-main">
+          <PopulationScene
+            key={overview ? "overview" : group}
+            stacks={markers}
+            onBack={() => openGroup(undefined)}
+            overview={overview}
+            heading={overview ? "Group overview" : groupLabel(group!)}
+            selected={selected}
+            onActivate={(marker) => {
+              if (overview) openGroup(Number(marker.id));
+              else if (marker.sessions.length > 1) setStackId(marker.id);
+              else onSelect(marker.sessions[0]);
+            }}
           />
-          {Array.from(clusters).map(([id, group]) => {
-            const sx = group.map((d) => px(d.x)),
-              sy = group.map((d) => py(d.y));
-            const cx = sx.reduce((a, b) => a + b, 0) / sx.length,
-              cy = sy.reduce((a, b) => a + b, 0) / sy.length;
-            const rx = Math.max(15, ...sx.map((x) => Math.abs(x - cx) + 9)),
-              ry = Math.max(13, ...sy.map((y) => Math.abs(y - cy) + 9));
-            return (
-              <g key={id} aria-hidden="true">
-                <ellipse
-                  cx={cx}
-                  cy={cy}
-                  rx={rx}
-                  ry={ry}
-                  fill="var(--success)"
-                  fillOpacity=".035"
-                  stroke="#55779c"
-                  strokeOpacity=".28"
-                  strokeDasharray="3 4"
-                />
-                <text
-                  x={cx}
-                  y={Math.max(10, cy - ry - 4)}
-                  textAnchor="middle"
-                  fill="var(--muted)"
-                  fontSize="8"
-                >
-                  {"C" + id + " · " + group.length}
-                </text>
-              </g>
-            );
-          })}
-          {dots.map((dot, i) => (
-            <g
-              key={(dot.session_id || dot.operator_id || "") + i}
-              className="map-dot"
-              role="button"
-              tabIndex={0}
-              aria-label={
-                "Inspect " + (dot.operator_id || dot.session_id || "point")
-              }
-              onClick={() => onSelect(dot)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onSelect(dot);
-                }
-              }}
+          <div
+            className="population-legend"
+            role="group"
+            aria-label="Filter by session status"
+          >
+            <button
+              type="button"
+              aria-pressed={!filter}
+              onClick={() => changeFilter(undefined)}
             >
-              <title>
-                {dot.synthetic ? "Synthetic seed · " : ""}
-                {dot.operator_id} · {dot.status}
-              </title>
-              <circle
-                cx={px(dot.x)}
-                cy={py(dot.y)}
-                r="13"
-                fill={color(dot.status)}
-                opacity=".10"
-              />
-              <circle
-                cx={px(dot.x)}
-                cy={py(dot.y)}
-                r={selected && selected === dot.session_id ? 8 : 4}
-                fill={color(dot.status)}
-                stroke={dot.synthetic ? color(dot.status) : "#fff"}
-                fillOpacity={dot.synthetic ? 0.35 : 1}
-                strokeWidth="1"
-              />
-            </g>
-          ))}
-        </svg>
-        {!dots.length && (
-          <div className="map-empty">
-            <Radio size={23} />
-            <strong>Awaiting population data</strong>
-            <small>Scored sessions with map coordinates appear here.</small>
+              All <b>{sessions.length}</b>
+            </button>
+            {statuses.map((status) => {
+              const count = sessions.filter(
+                (session) => session.tone === status,
+              ).length;
+              return (
+                <button
+                  type="button"
+                  key={status}
+                  aria-pressed={filter === status}
+                  disabled={!count}
+                  onClick={() =>
+                    changeFilter(filter === status ? undefined : status)
+                  }
+                >
+                  <i data-tone={status} aria-hidden="true" />
+                  {status} <b>{count}</b>
+                </button>
+              );
+            })}
           </div>
-        )}
-      </div>
-      <footer className="map-legend">
-        <div>
-          <span>
-            <i />
-            Normal
-          </span>
-          <span>
-            <i />
-            Elevated
-          </span>
-          <span>
-            <i />
-            Critical
-          </span>
-          <span>
-            <i style={{ background: "var(--muted)" }} />
-            Unverified
-          </span>
+          <p className="population-note">
+            {overview
+              ? "Each number identifies a group at its average 3D position."
+              : "Color shows session status. A number marks sessions at the same position."}
+            {overview &&
+              groups.has(-1) &&
+              " Ungrouped sessions are listed separately."}
+            {sessions.some((s) => !s.position_3d) &&
+              " Sessions without 3D coordinates are available in the group list."}
+            {preview
+              ? " Showing synthetic fixtures."
+              : synthetic > 0
+                ? ` Seeded examples: ${synthetic}.`
+                : ""}
+          </p>
         </div>
-        <b>
-          {dots.length} POINTS
-          {dots.some((dot) => dot.synthetic) && (
-            <span>
-              {" "}
-              · {dots.filter((dot) => dot.synthetic).length} SYNTHETIC
-            </span>
+        <aside
+          id={browserId}
+          tabIndex={-1}
+          className="population-browser"
+          aria-label="Behavior groups and sessions"
+        >
+          <div className="population-browser-head">
+            {detail && (
+              <button
+                type="button"
+                className="population-back"
+                onClick={() => openGroup(stackSessions ? group : undefined)}
+              >
+                <ArrowLeft size={14} aria-hidden="true" />{" "}
+                {stackSessions ? groupLabel(group!) : "All groups"}
+              </button>
+            )}
+            <h3>
+              {stackSessions
+                ? "Overlapping sessions"
+                : groupSessions
+                  ? groupLabel(group!)
+                  : "Behavior groups"}
+            </h3>
+            <p aria-live="polite">
+              {detail
+                ? `${sessionCount(detail.length)}. Select a session to inspect it.`
+                : groupRows.length
+                  ? "Choose a group to see its sessions."
+                  : "Sessions appear here when they have a map position."}
+            </p>
+          </div>
+          {detail ? (
+            <ul className="population-list">
+              {detail.map((session) => (
+                <li key={session.id}>
+                  <button type="button" onClick={() => onSelect(session)}>
+                    <i
+                      className="population-status"
+                      data-tone={session.tone}
+                      aria-hidden="true"
+                    />
+                    <span>
+                      <strong>{session.description ?? session.label}</strong>
+                      {session.description && <small>{session.label}</small>}
+                      <small>{session.session_id ?? session.id}</small>
+                      <small
+                        className="population-row-tone"
+                        data-tone={session.tone}
+                      >
+                        {session.status === "BANNED" ? "Banned" : session.tone}
+                        {session.synthetic ? " · Seed" : ""}
+                      </small>
+                    </span>
+                    <ArrowUpRight size={16} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="population-list">
+              {groupRows.map(([group, members]) => (
+                <li key={group}>
+                  <button type="button" onClick={() => openGroup(group)}>
+                    <span className="population-group-icon">
+                      {group < 0 ? (
+                        <Layers3 size={17} aria-hidden="true" />
+                      ) : (
+                        <span aria-hidden="true">{group}</span>
+                      )}
+                    </span>
+                    <span>
+                      <strong>{groupLabel(group)}</strong>
+                      <small>{sessionCount(members.length)}</small>
+                    </span>
+                    <ChevronRight size={16} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
-        </b>
-      </footer>
+        </aside>
+      </div>
     </section>
   );
 }
+
 export function Waveform({ event }: { event?: DashboardEvent }) {
   const wave = event?.recoil_waveform || [];
   const times = wave.map((p) => p.t_ms),
