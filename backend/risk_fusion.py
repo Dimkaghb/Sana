@@ -4,6 +4,14 @@ from .config import Policy
 from .physics_engine import Evidence, flag
 
 
+def local_hold(context, recoil, coercion, policy):
+    return (recoil.score is not None and recoil.score >= policy.hold_threshold) or (
+        coercion.score is not None
+        and coercion.score >= policy.hold_threshold
+        and context["is_new_recipient"]
+    )
+
+
 def decide(telemetry, recoil: Evidence, coercion: Evidence, ml, policy: Policy):
     context = telemetry["transfer_context"]
     flags = [*recoil.flags, *coercion.flags]
@@ -67,14 +75,10 @@ def decide(telemetry, recoil: Evidence, coercion: Evidence, ml, policy: Policy):
     }
     overall = max((s for s in scores.values() if s is not None), default=None)
     hold = (
-        (recoil.score or 0) >= policy.hold_threshold
+        local_hold(context, recoil, coercion, policy)
         or banned
         or ring
         or (handoff and context["amount_kzt"] >= policy.handoff_amount)
-        or (
-            (coercion.score or 0) >= policy.hold_threshold
-            and context["is_new_recipient"]
-        )
     )
     if hold:
         decision = "MIRAGE_HOLD"

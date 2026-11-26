@@ -10,6 +10,7 @@ import time
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import UTC, datetime
+from weakref import WeakValueDictionary
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -26,12 +27,15 @@ from scripts.validate_contracts import (
 from .calibration import save_recording
 from .coercion_engine import analyze_coercion
 from .config import Settings
+from .coordination import IdentityAccess
 from .ml_client import EnrollmentRefused, IdentityService
 from .physics_engine import analyze_tap_recoil, flag
-from .risk_fusion import decide, eligible_for_enrollment
+from .risk_fusion import decide, eligible_for_enrollment, local_hold
 from .storage import Store
 
 BODY_LIMIT = 1_048_576
+LOCAL_HOLD_IDENTITY_BUDGET = 0.075
+IDENTITY_BUDGET = 1.5
 COLLECTION_LIMITS = {
     "imu_samples": 4096,
     "slider_trace": 2048,
@@ -93,7 +97,10 @@ def create_app(settings=None, transport=None):
         state.config = config
         state.checks = validators()
         state.store = Store(config.database)
-        state.lock = asyncio.Lock()
+        # Held and waiting coroutines keep a strong reference to their session
+        # lock. Completed IDs disappear from memory and are recovered via SQLite.
+        state.sessions = WeakValueDictionary()
+        state.identity_access = IdentityAccess()
         state.dashboard = set()
         state.phones = {}
         state.guardians = {}
@@ -212,7 +219,7 @@ def create_app(settings=None, transport=None):
         session = telemetry["session_id"]
         digest = hashlib.sha256(encoded).hexdigest()
         state = app.state
-        async with state.lock:
+        async with state.sessions.setdefault(session, asyncio.Lock()):
             row = state.store.session(session)
             if row:
                 if row["digest"] != digest:
@@ -229,7 +236,20 @@ def create_app(settings=None, transport=None):
             recoil = analyze_tap_recoil(telemetry, policy)
             coercion = analyze_coercion(telemetry)
             physics_ms = round((time.perf_counter() - start) * 1000, 3)
-            ml = await state.ml.score(telemetry)
+            budget = (
+                LOCAL_HOLD_IDENTITY_BUDGET
+                if local_hold(telemetry["transfer_context"], recoil, coercion, policy)
+                else IDENTITY_BUDGET
+            )
+            missed_deadline = False
+            try:
+                # Includes both waiting for an identity mutation and the ML call.
+                # No await occurs between releasing read access and committing C/D.
+                async with asyncio.timeout(budget), state.identity_access.score():
+                    ml = await state.ml.score(telemetry)
+            except TimeoutError:
+                ml = None
+                missed_deadline = True
             mode = state.config.mode
             operator = ml["operator_reconciliation"] if ml else {}
             op_id = operator.get("matched_operator_id")
@@ -238,6 +258,15 @@ def create_app(settings=None, transport=None):
             outcome, scores, overall, flags = decide(
                 telemetry, recoil, coercion, ml, policy
             )
+            if missed_deadline:
+                flags.append(
+                    flag(
+                        "IDENTITY_DEADLINE",
+                        "INFO",
+                        "Identity deadline elapsed",
+                        f"No identity result within the {round(budget * 1000)} ms budget.",
+                    )
+                )
             if mode == "mock":
                 flags.append(
                     flag(
@@ -364,7 +393,7 @@ def create_app(settings=None, transport=None):
                 422, "Explicit verification of this session's owner is required"
             )
         state = app.state
-        async with state.lock:
+        async with state.identity_access.change():
             row = state.store.session(session)
             if not row:
                 raise HTTPException(404, "Session not found")
@@ -403,7 +432,7 @@ def create_app(settings=None, transport=None):
     async def ban(operator: str, request: Request):
         admin(request)
         state = app.state
-        async with state.lock:
+        async with state.identity_access.change():
             mode = state.config.mode
             if state.store.ban_status(operator, mode) != "confirmed":
                 state.store.set_ban(operator, mode, "pending")
